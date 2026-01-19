@@ -1,0 +1,145 @@
+<Window x:Class="Hidratacao.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Hidratacao"
+        Width="460"
+        Height="300"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        Topmost="False"
+        FontFamily="Segoe UI Variable"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown">
+    <Window.Resources>
+        <SolidColorBrush x:Key="CardBrush" Color="#111621"/>
+        <SolidColorBrush x:Key="PanelBrush" Color="#171C29"/>
+        <SolidColorBrush x:Key="GlowBrush" Color="#6C63FF"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#7B61FF"/>
+        <SolidColorBrush x:Key="TextPrimary" Color="#EAF0F6"/>
+        <SolidColorBrush x:Key="TextSecondary" Color="#A9B4C3"/>
+        <SolidColorBrush x:Key="TextMuted" Color="#7B8796"/>
+
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#1E2536"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="#2B354B"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#232C41"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#182035"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="BorderBrush" Value="#3B2FD4"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Border CornerRadius="20" BorderThickness="1">
+            <Border.BorderBrush>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#3C2ED3" Offset="0"/>
+                    <GradientStop Color="#1A2335" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.BorderBrush>
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#0E111B" Offset="0"/>
+                    <GradientStop Color="#121827" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+
+            <Grid Margin="18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Row="0" Grid.Column="0">
+                    <TextBlock Text="Hidratacao" Foreground="{StaticResource TextSecondary}" FontSize="12" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="ClockText"
+                               Text="00:00:00"
+                               Foreground="{StaticResource TextPrimary}"
+                               FontSize="38"
+                               FontWeight="SemiBold"
+                               Margin="0,6,0,0"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button x:Name="MinimizeButton" Content="—" Width="30" Height="26" Margin="0,0,8,0" Click="MinimizeButton_Click"/>
+                    <Button x:Name="CloseButton" Content="✕" Width="30" Height="26" Click="CloseButton_Click"/>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Margin="0,12,0,0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="StartButton" Content="Start" Width="82" Height="30" Margin="0,0,8,0" Click="StartButton_Click" Style="{StaticResource AccentButton}"/>
+                    <Button x:Name="StopButton" Content="Stop" Width="82" Height="30" Margin="0,0,16,0" Click="StopButton_Click"/>
+                    <CheckBox x:Name="TopmostCheckBox" Content="Top" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Checked="TopmostCheckBox_Checked" Unchecked="TopmostCheckBox_Checked"/>
+                    <TextBlock Text="Transp" Foreground="{StaticResource TextMuted}" Margin="16,0,6,0" VerticalAlignment="Center"/>
+                    <Slider x:Name="OpacitySlider" Width="120" Minimum="0.55" Maximum="1" Value="0.9" ValueChanged="OpacitySlider_ValueChanged"/>
+                </StackPanel>
+
+                <Grid Grid.Row="2" Grid.ColumnSpan="2" Margin="0,14,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock x:Name="StatusText"
+                               Text="Status: parado"
+                               Foreground="{StaticResource TextSecondary}"
+                               FontSize="14"
+                               Grid.Row="0"/>
+                    <TextBlock x:Name="ReminderText"
+                               Text="Ultimo lembrete: -"
+                               Foreground="{StaticResource TextMuted}"
+                               FontSize="12"
+                               Grid.Row="1"
+                               Margin="0,6,0,0"/>
+
+                    <Border Grid.Row="2" Margin="0,10,0,0" Padding="12" Background="{StaticResource PanelBrush}" CornerRadius="14" BorderBrush="#2B354B" BorderThickness="1">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Meta de hoje" Foreground="{StaticResource TextMuted}" FontSize="11"/>
+                            <TextBlock x:Name="GoalText" Text="0 ml" Foreground="{StaticResource TextPrimary}" FontSize="22" FontWeight="SemiBold" Grid.Row="1"/>
+                            <TextBlock x:Name="ProgressText" Text="0% completo" Foreground="{StaticResource TextSecondary}" FontSize="12" Grid.Row="2"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

@@ -1,0 +1,28 @@
+{
+  "profiles": {
+    "Hidratacao.Cli (config show)": {
+      "commandName": "Project",
+      "commandLineArgs": "config --show"
+    },
+    "Hidratacao.Cli (log cup)": {
+      "commandName": "Project",
+      "commandLineArgs": "log --cup"
+    },
+    "Hidratacao.Cli (history 7d)": {
+      "commandName": "Project",
+      "commandLineArgs": "history --days 7"
+    },
+    "Hidratacao.Cli (export 7d)": {
+      "commandName": "Project",
+      "commandLineArgs": "export --days 7 --path exports"
+    },
+    "Hidratacao.Cli (daemon start)": {
+      "commandName": "Project",
+      "commandLineArgs": "daemon start"
+    },
+    "Hidratacao.Cli (daemon stop)": {
+      "commandName": "Project",
+      "commandLineArgs": "daemon stop"
+    }
+  }
+}

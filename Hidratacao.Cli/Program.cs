@@ -285,44 +285,22 @@ static async Task StartDaemonAsync()
     };
 
     Console.WriteLine("Daemon iniciado. Pressione Ctrl+C para encerrar.");
-    var service = CreateSettingsService();
+    var scheduler = CreateReminderScheduler();
+    scheduler.Reminder += (_, args) =>
+    {
+        Console.WriteLine($"[{args.OccurredAtLocal:HH:mm}] Lembrete: faltam {args.RemainingMl} ml para a meta. Sugestão: {args.SuggestedMl} ml.");
+        try
+        {
+            Console.Beep();
+        }
+        catch (PlatformNotSupportedException)
+        {
+        }
+    };
 
     try
     {
-        while (!cts.IsCancellationRequested)
-        {
-            var settings = await service.GetAsync(cts.Token);
-            var now = DateTime.Now;
-            var start = DateTime.Today.Add(settings.ActiveHoursStart.ToTimeSpan());
-            var end = DateTime.Today.Add(settings.ActiveHoursEnd.ToTimeSpan());
-
-            if (now < start)
-            {
-                await DelaySafe(start - now, cts.Token);
-                continue;
-            }
-
-            if (now >= end)
-            {
-                await DelaySafe(start.AddDays(1) - now, cts.Token);
-                continue;
-            }
-
-            var next = now.AddMinutes(settings.ReminderIntervalMinutes);
-            if (next > end)
-            {
-                await DelaySafe(start.AddDays(1) - now, cts.Token);
-                continue;
-            }
-
-            await DelaySafe(next - now, cts.Token);
-            if (cts.IsCancellationRequested)
-            {
-                break;
-            }
-
-            EmitReminder(settings);
-        }
+        await scheduler.RunAsync(cts.Token);
     }
     finally
     {
@@ -404,27 +382,15 @@ static ExportService CreateExportService()
     return new ExportService(historyService, eventRepository);
 }
 
-static void EmitReminder(Hidratacao.Domain.Settings settings)
+static ReminderScheduler CreateReminderScheduler()
 {
-    var remaining = settings.DailyGoalMl;
-    Console.WriteLine($"[{DateTime.Now:HH:mm}] Lembrete: faltam {remaining} ml para a meta. Sugestão: {settings.DefaultCupMl} ml.");
-    try
-    {
-        Console.Beep();
-    }
-    catch (PlatformNotSupportedException)
-    {
-    }
-}
-
-static async Task DelaySafe(TimeSpan delay, CancellationToken cancellationToken)
-{
-    if (delay < TimeSpan.Zero)
-    {
-        delay = TimeSpan.Zero;
-    }
-
-    await Task.Delay(delay, cancellationToken);
+    var basePath = Environment.CurrentDirectory;
+    var settingsRepository = new JsonSettingsRepository(basePath);
+    var summaryRepository = new JsonDailySummaryRepository(basePath);
+    var eventRepository = new JsonWaterEventRepository(basePath);
+    var settingsService = new SettingsService(settingsRepository);
+    var historyService = new WaterHistoryService(settingsRepository, summaryRepository, eventRepository);
+    return new ReminderScheduler(settingsService, historyService);
 }
 
 static void ShowHelp()
