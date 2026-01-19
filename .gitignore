@@ -34,6 +34,7 @@ settings.json
 daemon.pid
 water_events.json
 daily_summary.json
+exports/
 
 # Task files
 # tasks.json

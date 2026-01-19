@@ -21,6 +21,12 @@ switch (command)
     case "log":
         await RunLogAsync(args.Skip(1).ToArray());
         break;
+    case "history":
+        await RunHistoryAsync(args.Skip(1).ToArray());
+        break;
+    case "export":
+        await RunExportAsync(args.Skip(1).ToArray());
+        break;
     default:
         Console.WriteLine("Comando inválido.");
         ShowHelp();
@@ -186,6 +192,78 @@ static async Task RunLogAsync(string[] options)
     Console.WriteLine($"Registrado {amountMl} ml. Total de hoje: {add.TotalTodayMl} ml.");
 }
 
+static async Task RunHistoryAsync(string[] options)
+{
+    var days = 7;
+    for (var i = 0; i < options.Length; i++)
+    {
+        var option = options[i].ToLowerInvariant();
+        switch (option)
+        {
+            case "--days":
+                if (!TryReadInt(options, ref i, out var parsedDays))
+                {
+                    Console.WriteLine("Informe um valor inteiro para --days.");
+                    return;
+                }
+                days = parsedDays;
+                break;
+            default:
+                Console.WriteLine($"Opção desconhecida: {options[i]}");
+                ShowHistoryHelp();
+                return;
+        }
+    }
+
+    var historyService = CreateWaterHistoryService();
+    var items = await historyService.GetHistoryAsync(days);
+
+    Console.WriteLine("Data (UTC) | Total (ml) | Status | Progresso");
+    foreach (var item in items)
+    {
+        Console.WriteLine($"{item.DateUtc:yyyy-MM-dd} | {item.TotalMl,9} | {item.Status,-10} | {item.ProgressPercent,3}%");
+    }
+}
+
+static async Task RunExportAsync(string[] options)
+{
+    var days = 7;
+    var directory = Environment.CurrentDirectory;
+
+    for (var i = 0; i < options.Length; i++)
+    {
+        var option = options[i].ToLowerInvariant();
+        switch (option)
+        {
+            case "--days":
+                if (!TryReadInt(options, ref i, out var parsedDays))
+                {
+                    Console.WriteLine("Informe um valor inteiro para --days.");
+                    return;
+                }
+                days = parsedDays;
+                break;
+            case "--path":
+                if (!TryReadString(options, ref i, out var path))
+                {
+                    Console.WriteLine("Informe um caminho para --path.");
+                    return;
+                }
+                directory = path;
+                break;
+            default:
+                Console.WriteLine($"Opção desconhecida: {options[i]}");
+                ShowExportHelp();
+                return;
+        }
+    }
+
+    var exportService = CreateExportService();
+    var result = await exportService.ExportAsync(directory, days);
+    Console.WriteLine($"CSV de totais: {result.TotalsPath}");
+    Console.WriteLine($"CSV de eventos: {result.EventsPath}");
+}
+
 static async Task StartDaemonAsync()
 {
     using var mutex = new Mutex(false, "Global\\HidratacaoDaemon");
@@ -307,6 +385,25 @@ static WaterEntryService CreateWaterEntryService()
     return new WaterEntryService(eventRepository, summaryRepository);
 }
 
+static WaterHistoryService CreateWaterHistoryService()
+{
+    var basePath = Environment.CurrentDirectory;
+    var settingsRepository = new JsonSettingsRepository(basePath);
+    var summaryRepository = new JsonDailySummaryRepository(basePath);
+    var eventRepository = new JsonWaterEventRepository(basePath);
+    return new WaterHistoryService(settingsRepository, summaryRepository, eventRepository);
+}
+
+static ExportService CreateExportService()
+{
+    var basePath = Environment.CurrentDirectory;
+    var settingsRepository = new JsonSettingsRepository(basePath);
+    var summaryRepository = new JsonDailySummaryRepository(basePath);
+    var eventRepository = new JsonWaterEventRepository(basePath);
+    var historyService = new WaterHistoryService(settingsRepository, summaryRepository, eventRepository);
+    return new ExportService(historyService, eventRepository);
+}
+
 static void EmitReminder(Hidratacao.Domain.Settings settings)
 {
     var remaining = settings.DailyGoalMl;
@@ -340,6 +437,8 @@ static void ShowHelp()
     Console.WriteLine("  hidratacao log <ml>");
     Console.WriteLine("  hidratacao log --cup");
     Console.WriteLine("  hidratacao log --undo");
+    Console.WriteLine("  hidratacao history --days 7");
+    Console.WriteLine("  hidratacao export --days 7 --path ./exports");
 }
 
 static void ShowConfigHelp()
@@ -365,6 +464,18 @@ static void ShowLogHelp()
     Console.WriteLine("  log <ml>");
     Console.WriteLine("  log --cup");
     Console.WriteLine("  log --undo");
+}
+
+static void ShowHistoryHelp()
+{
+    Console.WriteLine("Uso do comando history:");
+    Console.WriteLine("  history --days <N>");
+}
+
+static void ShowExportHelp()
+{
+    Console.WriteLine("Uso do comando export:");
+    Console.WriteLine("  export --days <N> --path <diretorio>");
 }
 
 static bool TryReadInt(string[] options, ref int index, out int value)
