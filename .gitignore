@@ -15,6 +15,7 @@ node_modules/
 # Editor directories and files
 .idea
 .vscode
+.vs
 *.suo
 *.ntvs*
 *.njsproj
@@ -30,6 +31,7 @@ obj/
 
 # Local data
 settings.json
+daemon.pid
 
 # Task files
 # tasks.json

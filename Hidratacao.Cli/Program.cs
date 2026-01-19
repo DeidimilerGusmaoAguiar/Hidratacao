@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using Hidratacao.Application;
 using Hidratacao.Infrastructure;
@@ -9,93 +10,259 @@ if (args.Length == 0)
 }
 
 var command = args[0].ToLowerInvariant();
-if (command != "config")
+switch (command)
 {
-    Console.WriteLine("Comando inválido.");
-    ShowHelp();
-    return;
+    case "config":
+        await RunConfigAsync(args.Skip(1).ToArray());
+        break;
+    case "daemon":
+        await RunDaemonAsync(args.Skip(1).ToArray());
+        break;
+    default:
+        Console.WriteLine("Comando inválido.");
+        ShowHelp();
+        break;
 }
 
-var options = args.Skip(1).ToArray();
-if (options.Length == 0)
+static async Task RunConfigAsync(string[] options)
 {
-    ShowConfigHelp();
-    return;
-}
-
-var basePath = Environment.CurrentDirectory;
-var repository = new JsonSettingsRepository(basePath);
-var service = new SettingsService(repository);
-
-var show = false;
-var update = new SettingsUpdate();
-
-for (var i = 0; i < options.Length; i++)
-{
-    var option = options[i].ToLowerInvariant();
-    switch (option)
+    if (options.Length == 0)
     {
-        case "--show":
-            show = true;
-            break;
-        case "--goal":
-            if (!TryReadInt(options, ref i, out var goal))
-            {
-                Console.WriteLine("Informe um valor inteiro para --goal.");
-                return;
-            }
-            update = update with { DailyGoalMl = goal };
-            break;
-        case "--active-hours":
-            if (!TryReadString(options, ref i, out var range) ||
-                !TryParseHoursRange(range, out var start, out var end))
-            {
-                Console.WriteLine("Formato inválido. Use HH:MM-HH:MM em --active-hours.");
-                return;
-            }
-            update = update with { ActiveHoursStart = start, ActiveHoursEnd = end };
-            break;
-        case "--interval":
-            if (!TryReadInt(options, ref i, out var interval))
-            {
-                Console.WriteLine("Informe um valor inteiro para --interval.");
-                return;
-            }
-            update = update with { ReminderIntervalMinutes = interval };
-            break;
-        case "--cup-size":
-            if (!TryReadInt(options, ref i, out var cup))
-            {
-                Console.WriteLine("Informe um valor inteiro para --cup-size.");
-                return;
-            }
-            update = update with { DefaultCupMl = cup };
-            break;
-        default:
-            Console.WriteLine($"Opção desconhecida: {options[i]}");
-            ShowConfigHelp();
-            return;
-    }
-}
-
-var hasUpdate = update != new SettingsUpdate();
-if (hasUpdate)
-{
-    var result = await service.UpdateAsync(update);
-    if (!result.Success)
-    {
-        foreach (var error in result.Errors)
-        {
-            Console.WriteLine($"Erro: {error}");
-        }
+        ShowConfigHelp();
         return;
     }
+
+    var service = CreateSettingsService();
+    var show = false;
+    var update = new SettingsUpdate();
+
+    for (var i = 0; i < options.Length; i++)
+    {
+        var option = options[i].ToLowerInvariant();
+        switch (option)
+        {
+            case "--show":
+                show = true;
+                break;
+            case "--goal":
+                if (!TryReadInt(options, ref i, out var goal))
+                {
+                    Console.WriteLine("Informe um valor inteiro para --goal.");
+                    return;
+                }
+                update = update with { DailyGoalMl = goal };
+                break;
+            case "--active-hours":
+                if (!TryReadString(options, ref i, out var range) ||
+                    !TryParseHoursRange(range, out var start, out var end))
+                {
+                    Console.WriteLine("Formato inválido. Use HH:MM-HH:MM em --active-hours.");
+                    return;
+                }
+                update = update with { ActiveHoursStart = start, ActiveHoursEnd = end };
+                break;
+            case "--interval":
+                if (!TryReadInt(options, ref i, out var interval))
+                {
+                    Console.WriteLine("Informe um valor inteiro para --interval.");
+                    return;
+                }
+                update = update with { ReminderIntervalMinutes = interval };
+                break;
+            case "--cup-size":
+                if (!TryReadInt(options, ref i, out var cup))
+                {
+                    Console.WriteLine("Informe um valor inteiro para --cup-size.");
+                    return;
+                }
+                update = update with { DefaultCupMl = cup };
+                break;
+            default:
+                Console.WriteLine($"Opção desconhecida: {options[i]}");
+                ShowConfigHelp();
+                return;
+        }
+    }
+
+    var hasUpdate = update != new SettingsUpdate();
+    if (hasUpdate)
+    {
+        var result = await service.UpdateAsync(update);
+        if (!result.Success)
+        {
+            foreach (var error in result.Errors)
+            {
+                Console.WriteLine($"Erro: {error}");
+            }
+            return;
+        }
+    }
+
+    if (show || !hasUpdate)
+    {
+        var settings = await service.GetAsync();
+        PrintSettings(settings);
+    }
 }
 
-if (show || !hasUpdate)
+static async Task RunDaemonAsync(string[] options)
 {
-    var settings = await service.GetAsync();
-    PrintSettings(settings);
+    if (options.Length == 0)
+    {
+        ShowDaemonHelp();
+        return;
+    }
+
+    var action = options[0].ToLowerInvariant();
+    switch (action)
+    {
+        case "start":
+            await StartDaemonAsync();
+            break;
+        case "stop":
+            StopDaemon();
+            break;
+        default:
+            Console.WriteLine("Ação inválida para daemon.");
+            ShowDaemonHelp();
+            break;
+    }
+}
+
+static async Task StartDaemonAsync()
+{
+    using var mutex = new Mutex(false, "Global\\HidratacaoDaemon");
+    if (!mutex.WaitOne(0))
+    {
+        Console.WriteLine("Daemon já está em execução.");
+        return;
+    }
+
+    var basePath = Environment.CurrentDirectory;
+    var pidFile = Path.Combine(basePath, "daemon.pid");
+    File.WriteAllText(pidFile, Environment.ProcessId.ToString(CultureInfo.InvariantCulture));
+
+    using var cts = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, e) =>
+    {
+        e.Cancel = true;
+        cts.Cancel();
+    };
+
+    Console.WriteLine("Daemon iniciado. Pressione Ctrl+C para encerrar.");
+    var service = CreateSettingsService();
+
+    try
+    {
+        while (!cts.IsCancellationRequested)
+        {
+            var settings = await service.GetAsync(cts.Token);
+            var now = DateTime.Now;
+            var start = DateTime.Today.Add(settings.ActiveHoursStart.ToTimeSpan());
+            var end = DateTime.Today.Add(settings.ActiveHoursEnd.ToTimeSpan());
+
+            if (now < start)
+            {
+                await DelaySafe(start - now, cts.Token);
+                continue;
+            }
+
+            if (now >= end)
+            {
+                await DelaySafe(start.AddDays(1) - now, cts.Token);
+                continue;
+            }
+
+            var next = now.AddMinutes(settings.ReminderIntervalMinutes);
+            if (next > end)
+            {
+                await DelaySafe(start.AddDays(1) - now, cts.Token);
+                continue;
+            }
+
+            await DelaySafe(next - now, cts.Token);
+            if (cts.IsCancellationRequested)
+            {
+                break;
+            }
+
+            EmitReminder(settings);
+        }
+    }
+    finally
+    {
+        if (File.Exists(pidFile))
+        {
+            File.Delete(pidFile);
+        }
+    }
+}
+
+static void StopDaemon()
+{
+    var basePath = Environment.CurrentDirectory;
+    var pidFile = Path.Combine(basePath, "daemon.pid");
+    if (!File.Exists(pidFile))
+    {
+        Console.WriteLine("Daemon não está em execução.");
+        return;
+    }
+
+    var content = File.ReadAllText(pidFile).Trim();
+    if (!int.TryParse(content, NumberStyles.Integer, CultureInfo.InvariantCulture, out var pid))
+    {
+        Console.WriteLine("PID inválido no arquivo de daemon.");
+        return;
+    }
+
+    try
+    {
+        var process = Process.GetProcessById(pid);
+        process.Kill(true);
+        process.WaitForExit(5000);
+        Console.WriteLine("Daemon encerrado.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Falha ao encerrar daemon: {ex.Message}");
+    }
+    finally
+    {
+        if (File.Exists(pidFile))
+        {
+            File.Delete(pidFile);
+        }
+    }
+}
+
+static SettingsService CreateSettingsService()
+{
+    var basePath = Environment.CurrentDirectory;
+    var repository = new JsonSettingsRepository(basePath);
+    return new SettingsService(repository);
+}
+
+static void EmitReminder(Hidratacao.Domain.Settings settings)
+{
+    var remaining = settings.DailyGoalMl;
+    Console.WriteLine($"[{DateTime.Now:HH:mm}] Lembrete: faltam {remaining} ml para a meta. Sugestão: {settings.DefaultCupMl} ml.");
+    try
+    {
+        Console.Beep();
+    }
+    catch (PlatformNotSupportedException)
+    {
+    }
+}
+
+static async Task DelaySafe(TimeSpan delay, CancellationToken cancellationToken)
+{
+    if (delay < TimeSpan.Zero)
+    {
+        delay = TimeSpan.Zero;
+    }
+
+    await Task.Delay(delay, cancellationToken);
 }
 
 static void ShowHelp()
@@ -103,6 +270,8 @@ static void ShowHelp()
     Console.WriteLine("Uso:");
     Console.WriteLine("  hidratacao config --show");
     Console.WriteLine("  hidratacao config --goal 2000 --active-hours 08:00-22:00 --interval 30 --cup-size 250");
+    Console.WriteLine("  hidratacao daemon start");
+    Console.WriteLine("  hidratacao daemon stop");
 }
 
 static void ShowConfigHelp()
@@ -113,6 +282,13 @@ static void ShowConfigHelp()
     Console.WriteLine("  --active-hours <HH:MM-HH:MM>");
     Console.WriteLine("  --interval <minutos>");
     Console.WriteLine("  --cup-size <ml>");
+}
+
+static void ShowDaemonHelp()
+{
+    Console.WriteLine("Uso do comando daemon:");
+    Console.WriteLine("  start");
+    Console.WriteLine("  stop");
 }
 
 static bool TryReadInt(string[] options, ref int index, out int value)
