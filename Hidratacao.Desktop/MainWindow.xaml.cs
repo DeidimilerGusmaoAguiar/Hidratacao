@@ -13,9 +13,48 @@ public partial class MainWindow : Window
     private readonly SettingsService _settingsService;
     private readonly WaterHistoryService _historyService;
     private readonly ReminderScheduler _scheduler;
+    private readonly WaterEntryService _waterEntryService;
     private readonly DispatcherTimer _clockTimer;
     private readonly DispatcherTimer _summaryTimer;
+    private readonly DispatcherTimer _nextReminderTimer;
     private CancellationTokenSource? _daemonCts;
+    private DateTime? _nextReminderAt;
+    private Hidratacao.Domain.Settings? _lastSettings;
+    private readonly Random _random = new();
+    private int _lastMessageIndex = -1;
+    private readonly string[] _logMessages =
+    [
+        "Boa. Mais um gole na conta.",
+        "Olha so, a hidratacao apareceu.",
+        "Copinho registrado. Milagre.",
+        "Isso, finge que e atleta.",
+        "Agua confirmada. Vida organizada.",
+        "Um gole a mais, um drama a menos.",
+        "Voce bebeu agua. O universo agradece.",
+        "Mais agua. Menos desculpa.",
+        "Excelente. Ainda nao virou cacto.",
+        "Ta, isso conta como autocuidado.",
+        "Hidratacao em dia. Quase um evento historico.",
+        "Boa. Continua antes que eu reclame.",
+        "So mais um e ja da pra dizer que se cuida.",
+        "Gole registrado. A balanca do cosmos sorriu.",
+        "Parabens, voce venceu o deserto interno.",
+        "Ok, ok. Isso foi decente.",
+        "Notificacao: seu corpo pediu e voce ouviu.",
+        "Sim, agua. Finalmente.",
+        "Mantem o ritmo, ou vai secar.",
+        "Se fosse cafe, voce ja tava na terceira.",
+        "Registrei. Nao some de novo.",
+        "Mais agua, menos drama.",
+        "Voce nao e cactus. Prove.",
+        "Esse copo foi real ou imaginario?",
+        "Boa. Ainda faltam uns litros, mas seguimos.",
+        "Bebeu? Entao ta.",
+        "Tomou agua. Pode se gabar por 5 minutos.",
+        "Ok. Pelo menos isso hoje.",
+        "Tem certeza que e agua? To achando que ta e comendo e vai virar uma bola e ta dizendo que ta tomando agua.",
+        "Atualizado. Segue o baile."
+    ];
 
     public MainWindow()
     {
@@ -28,11 +67,13 @@ public partial class MainWindow : Window
 
         _settingsService = new SettingsService(settingsRepository);
         _historyService = new WaterHistoryService(settingsRepository, summaryRepository, eventRepository);
+        _waterEntryService = new WaterEntryService(eventRepository, summaryRepository);
         _scheduler = new ReminderScheduler(_settingsService, _historyService);
         _scheduler.Reminder += (_, args) =>
         {
             ReminderText.Text = $"Ultimo lembrete: {args.OccurredAtLocal:HH:mm} - faltam {args.RemainingMl} ml";
             _ = UpdateSummaryAsync();
+            _ = UpdateNextReminderAsync();
             try
             {
                 SystemSounds.Asterisk.Play();
@@ -50,8 +91,13 @@ public partial class MainWindow : Window
         _summaryTimer.Tick += async (_, _) => await UpdateSummaryAsync();
         _summaryTimer.Start();
 
+        _nextReminderTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _nextReminderTimer.Tick += (_, _) => UpdateNextReminderCountdown();
+        _nextReminderTimer.Start();
+
         Opacity = OpacitySlider.Value;
         _ = UpdateSummaryAsync();
+        _ = UpdateNextReminderAsync();
     }
 
     private async Task UpdateSummaryAsync()
@@ -67,6 +113,40 @@ public partial class MainWindow : Window
         var today = history[0];
         GoalText.Text = $"{today.TotalMl} / {today.DailyGoalMl} ml";
         ProgressText.Text = $"{today.ProgressPercent}% completo";
+
+        var list = await _historyService.GetHistoryAsync(7);
+        HistoryList.ItemsSource = list.Select(item => new HistoryRow(
+            item.DateUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            $"{item.TotalMl} ml",
+            item.Status)).ToList();
+    }
+
+    private async Task UpdateNextReminderAsync()
+    {
+        _lastSettings = await _settingsService.GetAsync();
+        var lastEvent = await _historyService.GetLastEventLocalAsync();
+        _nextReminderAt = ReminderScheduleCalculator.GetNextReminderAtLocal(_lastSettings, DateTime.Now, lastEvent);
+        UpdateNextReminderCountdown();
+    }
+
+    private void UpdateNextReminderCountdown()
+    {
+        if (_nextReminderAt is null)
+        {
+            NextReminderText.Text = "Proximo: -";
+            return;
+        }
+
+        var now = DateTime.Now;
+        var remaining = _nextReminderAt.Value - now;
+        if (remaining < TimeSpan.Zero)
+        {
+            remaining = TimeSpan.Zero;
+        }
+
+        var minutes = (int)Math.Floor(remaining.TotalMinutes);
+        var seconds = remaining.Seconds;
+        NextReminderText.Text = $"Proximo: {_nextReminderAt:HH:mm} (em {minutes}m {seconds}s)";
     }
 
     private async void StartButton_Click(object sender, RoutedEventArgs e)
@@ -87,6 +167,21 @@ public partial class MainWindow : Window
         _daemonCts?.Cancel();
         _daemonCts = null;
         StatusText.Text = "Status: parado";
+    }
+
+    private async void QuickLogButton_Click(object sender, RoutedEventArgs e)
+    {
+        var settings = _lastSettings ?? await _settingsService.GetAsync();
+        var result = await _waterEntryService.AddCupAsync(settings.DefaultCupMl);
+        if (!result.Success)
+        {
+            MessageBox.Show(result.Error ?? "Falha ao registrar copo.", "Hidratacao", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        FeedbackText.Text = PickRandomMessage();
+        await UpdateSummaryAsync();
+        await UpdateNextReminderAsync();
     }
 
 
@@ -118,4 +213,22 @@ public partial class MainWindow : Window
         }
     }
 
+    private string PickRandomMessage()
+    {
+        if (_logMessages.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        int index;
+        do
+        {
+            index = _random.Next(_logMessages.Length);
+        } while (_logMessages.Length > 1 && index == _lastMessageIndex);
+
+        _lastMessageIndex = index;
+        return _logMessages[index];
+    }
+
+    private sealed record HistoryRow(string Date, string Total, string Status);
 }

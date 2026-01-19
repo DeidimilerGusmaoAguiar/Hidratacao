@@ -19,28 +19,8 @@ public sealed class ReminderScheduler
         {
             var settings = await _settingsService.GetAsync(cancellationToken);
             var now = DateTime.Now;
-            var start = DateTime.Today.Add(settings.ActiveHoursStart.ToTimeSpan());
-            var end = DateTime.Today.Add(settings.ActiveHoursEnd.ToTimeSpan());
-
-            if (now < start)
-            {
-                await DelaySafe(start - now, cancellationToken);
-                continue;
-            }
-
-            if (now >= end)
-            {
-                await DelaySafe(start.AddDays(1) - now, cancellationToken);
-                continue;
-            }
-
-            var next = now.AddMinutes(settings.ReminderIntervalMinutes);
-            if (next > end)
-            {
-                await DelaySafe(start.AddDays(1) - now, cancellationToken);
-                continue;
-            }
-
+            var lastEvent = await _historyService.GetLastEventLocalAsync(cancellationToken);
+            var next = ReminderScheduleCalculator.GetNextReminderAtLocal(settings, now, lastEvent);
             await DelaySafe(next - now, cancellationToken);
             if (cancellationToken.IsCancellationRequested)
             {

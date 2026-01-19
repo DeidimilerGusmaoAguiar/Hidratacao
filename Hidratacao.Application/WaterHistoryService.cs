@@ -63,4 +63,16 @@ public sealed class WaterHistoryService
 
         return items;
     }
+
+    public async Task<DateTime?> GetLastEventLocalAsync(CancellationToken cancellationToken = default)
+    {
+        var events = await _eventRepository.GetAllAsync(cancellationToken);
+        if (events.Count == 0)
+        {
+            return null;
+        }
+
+        var last = events.Max(e => e.OccurredAtUtc.UtcDateTime);
+        return DateTime.SpecifyKind(last, DateTimeKind.Utc).ToLocalTime();
+    }
 }
