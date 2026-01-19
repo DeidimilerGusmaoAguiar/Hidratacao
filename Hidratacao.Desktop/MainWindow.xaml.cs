@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Media;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Hidratacao.Application;
 using Hidratacao.Infrastructure;
@@ -17,6 +19,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _clockTimer;
     private readonly DispatcherTimer _summaryTimer;
     private readonly DispatcherTimer _nextReminderTimer;
+    private readonly DispatcherTimer _toastTimer;
     private CancellationTokenSource? _daemonCts;
     private DateTime? _nextReminderAt;
     private Hidratacao.Domain.Settings? _lastSettings;
@@ -94,6 +97,9 @@ public partial class MainWindow : Window
         _nextReminderTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _nextReminderTimer.Tick += (_, _) => UpdateNextReminderCountdown();
         _nextReminderTimer.Start();
+
+        _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _toastTimer.Tick += (_, _) => HideToast();
 
         Opacity = OpacitySlider.Value;
         _ = UpdateSummaryAsync();
@@ -179,7 +185,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        FeedbackText.Text = PickRandomMessage();
+        ShowToast(PickRandomMessage());
         await UpdateSummaryAsync();
         await UpdateNextReminderAsync();
     }
@@ -211,6 +217,42 @@ public partial class MainWindow : Window
         {
             DragMove();
         }
+    }
+
+    private void ShowToast(string message)
+    {
+        ToastText.Text = message;
+        ToastCard.Visibility = Visibility.Visible;
+        _toastTimer.Stop();
+        _toastTimer.Start();
+
+        var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180));
+        ToastCard.BeginAnimation(OpacityProperty, fadeIn);
+
+        var slideIn = new DoubleAnimation(-10, 0, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+        };
+        ToastTranslate.BeginAnimation(TranslateTransform.YProperty, slideIn);
+    }
+
+    private void HideToast()
+    {
+        _toastTimer.Stop();
+        var fadeOut = new DoubleAnimation(0, TimeSpan.FromMilliseconds(180));
+        fadeOut.Completed += (_, _) => ToastCard.Visibility = Visibility.Collapsed;
+        ToastCard.BeginAnimation(OpacityProperty, fadeOut);
+
+        var slideOut = new DoubleAnimation(-10, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
+        };
+        ToastTranslate.BeginAnimation(TranslateTransform.YProperty, slideOut);
+    }
+
+    private void ToastCloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        HideToast();
     }
 
     private string PickRandomMessage()

@@ -130,11 +130,6 @@
                                    Foreground="{StaticResource TextMuted}"
                                    FontSize="12"
                                    Margin="0,4,0,0"/>
-                        <TextBlock x:Name="FeedbackText"
-                                   Text=""
-                                   Foreground="{StaticResource TextSecondary}"
-                                   FontSize="12"
-                                   Margin="0,4,0,0"/>
                     </StackPanel>
 
                     <Grid Grid.Row="2" Margin="0,10,0,0">
@@ -187,5 +182,56 @@
                 </Grid>
             </Grid>
         </Border>
+        <Grid x:Name="ToastLayer" IsHitTestVisible="True">
+            <Border x:Name="ToastCard"
+                    Visibility="Collapsed"
+                    Opacity="0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Margin="0,6,6,0"
+                    Background="#151B2A"
+                    BorderBrush="#2B354B"
+                    BorderThickness="1"
+                    CornerRadius="14"
+                    Padding="12">
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="ToastTranslate" Y="-10"/>
+                </Border.RenderTransform>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Viewbox Width="70" Height="70" Grid.Column="0">
+                        <Canvas Width="70" Height="70">
+                            <Ellipse Canvas.Left="12" Canvas.Top="8" Width="28" Height="28" Fill="#E9C9B0"/>
+                            <Ellipse Canvas.Left="6" Canvas.Top="26" Width="40" Height="30" Fill="#F2B56B"/>
+                            <Ellipse Canvas.Left="0" Canvas.Top="40" Width="52" Height="26" Fill="#E09550"/>
+                            <Ellipse Canvas.Left="26" Canvas.Top="32" Width="18" Height="18" Fill="#E9C9B0"/>
+                            <Rectangle Canvas.Left="34" Canvas.Top="32" Width="30" Height="6" Fill="#E9C9B0" />
+                            <Polygon Points="62,34 70,38 62,42" Fill="#E9C9B0"/>
+                            <Ellipse Canvas.Left="20" Canvas.Top="16" Width="4" Height="4" Fill="#1B1E28"/>
+                            <Ellipse Canvas.Left="28" Canvas.Top="16" Width="4" Height="4" Fill="#1B1E28"/>
+                            <Path Data="M18,24 Q24,28 30,24" Stroke="#1B1E28" StrokeThickness="2" StrokeEndLineCap="Round"/>
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock x:Name="ToastText"
+                               Grid.Column="1"
+                               Text="Mensagem"
+                               Foreground="{StaticResource TextPrimary}"
+                               TextWrapping="Wrap"
+                               FontSize="12"
+                               Margin="6,0,8,0"/>
+                    <Button x:Name="ToastCloseButton"
+                            Grid.Column="2"
+                            Content="✕"
+                            Width="24"
+                            Height="24"
+                            Click="ToastCloseButton_Click"
+                            ToolTip="Fechar mensagem"/>
+                </Grid>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
