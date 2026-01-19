@@ -5,8 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="Hidratacao"
-        Width="460"
-        Height="300"
+        Width="560"
+        Height="360"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -58,7 +58,7 @@
         </Style>
     </Window.Resources>
 
-    <Grid Margin="16">
+    <Grid Margin="20">
         <Border CornerRadius="20" BorderThickness="1">
             <Border.BorderBrush>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
@@ -73,7 +73,7 @@
                 </LinearGradientBrush>
             </Border.Background>
 
-            <Grid Margin="18">
+            <Grid Margin="22">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>

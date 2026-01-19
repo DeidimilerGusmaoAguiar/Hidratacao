@@ -21,6 +21,7 @@ node_modules/
 *.njsproj
 *.sln
 *.sw?
+*.csproj.user
 
 # OS specific
 .DS_Store
