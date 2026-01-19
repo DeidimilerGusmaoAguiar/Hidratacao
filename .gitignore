@@ -32,6 +32,8 @@ obj/
 # Local data
 settings.json
 daemon.pid
+water_events.json
+daily_summary.json
 
 # Task files
 # tasks.json

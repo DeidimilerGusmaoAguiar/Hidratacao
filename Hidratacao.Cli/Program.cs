@@ -18,6 +18,9 @@ switch (command)
     case "daemon":
         await RunDaemonAsync(args.Skip(1).ToArray());
         break;
+    case "log":
+        await RunLogAsync(args.Skip(1).ToArray());
+        break;
     default:
         Console.WriteLine("Comando inválido.");
         ShowHelp();
@@ -127,6 +130,60 @@ static async Task RunDaemonAsync(string[] options)
             ShowDaemonHelp();
             break;
     }
+}
+
+static async Task RunLogAsync(string[] options)
+{
+    if (options.Length == 0)
+    {
+        ShowLogHelp();
+        return;
+    }
+
+    var service = CreateWaterEntryService();
+    var option = options[0].ToLowerInvariant();
+
+    if (option == "--undo")
+    {
+        var undo = await service.UndoLastTodayAsync();
+        if (!undo.Success)
+        {
+            Console.WriteLine($"Erro: {undo.Error}");
+            return;
+        }
+
+        Console.WriteLine($"Último registro removido. Total de hoje: {undo.TotalTodayMl} ml.");
+        return;
+    }
+
+    if (option == "--cup")
+    {
+        var settings = await CreateSettingsService().GetAsync();
+        var result = await service.AddCupAsync(settings.DefaultCupMl);
+        if (!result.Success)
+        {
+            Console.WriteLine($"Erro: {result.Error}");
+            return;
+        }
+
+        Console.WriteLine($"Registrado {settings.DefaultCupMl} ml. Total de hoje: {result.TotalTodayMl} ml.");
+        return;
+    }
+
+    if (!int.TryParse(option, NumberStyles.Integer, CultureInfo.InvariantCulture, out var amountMl))
+    {
+        Console.WriteLine("Informe um valor em ml ou use --cup/--undo.");
+        return;
+    }
+
+    var add = await service.AddMlAsync(amountMl);
+    if (!add.Success)
+    {
+        Console.WriteLine($"Erro: {add.Error}");
+        return;
+    }
+
+    Console.WriteLine($"Registrado {amountMl} ml. Total de hoje: {add.TotalTodayMl} ml.");
 }
 
 static async Task StartDaemonAsync()
@@ -242,6 +299,14 @@ static SettingsService CreateSettingsService()
     return new SettingsService(repository);
 }
 
+static WaterEntryService CreateWaterEntryService()
+{
+    var basePath = Environment.CurrentDirectory;
+    var eventRepository = new JsonWaterEventRepository(basePath);
+    var summaryRepository = new JsonDailySummaryRepository(basePath);
+    return new WaterEntryService(eventRepository, summaryRepository);
+}
+
 static void EmitReminder(Hidratacao.Domain.Settings settings)
 {
     var remaining = settings.DailyGoalMl;
@@ -272,6 +337,9 @@ static void ShowHelp()
     Console.WriteLine("  hidratacao config --goal 2000 --active-hours 08:00-22:00 --interval 30 --cup-size 250");
     Console.WriteLine("  hidratacao daemon start");
     Console.WriteLine("  hidratacao daemon stop");
+    Console.WriteLine("  hidratacao log <ml>");
+    Console.WriteLine("  hidratacao log --cup");
+    Console.WriteLine("  hidratacao log --undo");
 }
 
 static void ShowConfigHelp()
@@ -289,6 +357,14 @@ static void ShowDaemonHelp()
     Console.WriteLine("Uso do comando daemon:");
     Console.WriteLine("  start");
     Console.WriteLine("  stop");
+}
+
+static void ShowLogHelp()
+{
+    Console.WriteLine("Uso do comando log:");
+    Console.WriteLine("  log <ml>");
+    Console.WriteLine("  log --cup");
+    Console.WriteLine("  log --undo");
 }
 
 static bool TryReadInt(string[] options, ref int index, out int value)
