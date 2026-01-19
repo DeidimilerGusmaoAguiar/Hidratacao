@@ -3,4 +3,5 @@
   <Project Path="Hidratacao.Cli/Hidratacao.Cli.csproj" />
   <Project Path="Hidratacao.Domain/Hidratacao.Domain.csproj" />
   <Project Path="Hidratacao.Infrastructure/Hidratacao.Infrastructure.csproj" />
+  <Project Path="Hidratacao.Tests/Hidratacao.Tests.csproj" />
 </Solution>
