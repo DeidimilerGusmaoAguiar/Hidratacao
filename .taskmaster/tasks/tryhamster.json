@@ -1,0 +1,997 @@
+{
+  "tasks": [
+    {
+      "id": "DMA-16",
+      "title": "Water intake settings can be configured to personalize reminders and tracking",
+      "description": "Users can set their daily water goal, active hours, reminder frequency, and default cup size to match their personal hydration needs.",
+      "status": "in-progress",
+      "priority": "high",
+      "dependencies": [],
+      "details": "**User Capability**: Users can configure their personal hydration parameters (daily goal, active hours, reminder interval, default cup size) and view/update these settings at any time.\n\n**Business Value**: Personalization is essential for user adoption. Developers have different hydration needs and schedules. Without configuration, the app would be one-size-fits-all and unusable for most users. This task enables the app to adapt to individual preferences.\n\n**Functional Requirements**:\n- Store and retrieve 4 configuration parameters: daily_goal_ml, active_hours_start, active_hours_end, reminder_interval_minutes, default_cup_ml\n- Validate inputs: daily_goal > 0, active_hours in valid time format (HH:MM), reminder_interval > 0, default_cup > 0\n- Provide commands to set each parameter individually\n- Provide command to view all current settings\n- Persist settings to database on change\n- Load settings on app startup\n- Provide sensible defaults if no settings exist (e.g., 2000ml goal, 08:00-22:00 active, 30min interval, 250ml cup)\n\n**Data Model & Structure**:\n- Table: `settings` (single row)\n  - id (int, primary key, always 1)\n  - daily_goal_ml (int, not null, default 2000)\n  - active_hours_start (time, not null, default 08:00)\n  - active_hours_end (time, not null, default 22:00)\n  - reminder_interval_minutes (int, not null, default 30)\n  - default_cup_ml (int, not null, default 250)\n  - updated_at (datetime, tracks last modification)\n- Migration: Create settings table with defaults on first run\n\n**Technical Approach**:\n- Domain layer: Settings value object with validation logic\n- Application layer: SettingsService with Get/Update methods\n- Infrastructure layer: SQLiteSettingsRepository implementing ISettingsRepository\n- CLI layer: ConfigCommand with subcommands (--goal, --active-hours, --interval, --cup-size, --show)\n- Use System.CommandLine for command parsing\n- Validation in domain layer (throw DomainException for invalid inputs)\n\n**User Workflows**:\n1. User runs app first time → defaults loaded from database\n2. User runs `config --show` → sees current settings\n3. User runs `config --goal 2500` → validates input, updates database, confirms change\n4. User runs `config --active-hours 07:00-23:00` → parses time format, validates, updates\n5. User closes app and reopens → settings persist from database\n6. User runs `config --interval 45` → updates reminder frequency\n7. User runs `config --cup-size 200` → updates default cup volume\n\nEdge cases:\n- Invalid time format (e.g., \"25:00\") → reject with error message\n- Negative numbers → reject with error message\n- End time before start time → reject with error message\n- Zero or negative interval → reject with error message\n- User provides no arguments to config → show current settings\n\n**API/Interface Specifications**:\n- CLI Commands:\n  - `hidratacao config --show` → displays all settings in readable format\n  - `hidratacao config --goal <ml>` → sets daily goal\n  - `hidratacao config --active-hours <HH:MM>-<HH:MM>` → sets active window\n  - `hidratacao config --interval <minutes>` → sets reminder frequency\n  - `hidratacao config --cup-size <ml>` → sets default cup size\n- Domain Service: `ISettingsService.GetSettings() -> Settings`, `ISettingsService.UpdateSetting(key, value) -> void`\n- Repository: `ISettingsRepository.GetSettings() -> Settings`, `ISettingsRepository.SaveSettings(Settings) -> void`\n\n**Scope - INCLUDED**:\n- Configuration storage and retrieval\n- Input validation for all settings\n- CLI commands for viewing and updating settings\n- Default values on first run\n- Persistence to SQLite\n- Error handling for invalid inputs\n\n**Scope - EXCLUDED**:\n- Daemon/reminder logic (Task 2)\n- Water intake logging (Task 3)\n- History viewing and export (Task 4)\n\n**Success Criteria**:\n- User can set each configuration parameter via CLI\n- Settings persist across app restarts\n- Invalid inputs are rejected with clear error messages\n- Default settings exist on first run\n- `config --show` displays all current settings in readable format\n- Unit tests cover validation logic for all parameters\n- Unit tests verify persistence and retrieval\n\n**Constraints & Considerations**:\n- Time format must be consistent (HH:MM in 24-hour format)\n- Active hours validation: end time must be after start time\n- All numeric values must be positive integers\n- Settings table has single row (id=1) - no multi-user support\n- Performance: settings loaded once on app startup, cached in memory\n- No concurrent access concerns (single-user CLI app)\n- SQLite file location: app directory (configurable via environment variable if needed)",
+      "testStrategy": "",
+      "subtasks": [
+        {
+          "id": "DMA-23",
+          "parentId": "2ce67de2-4d91-490a-937f-1f89f4b1181b",
+          "title": "Design SQLite schema for water intake configuration storage",
+          "description": "Create the SQLite database schema that will persist all water intake configuration settings. This subtask focuses on designing and implementing the database structure that supports the configuration system.\\n\\nThe schema must include a single-row settings table (id=1) that stores:\\n- Daily water goal (positive integer, in milliliters)\\n- Active hours start time (HH:MM format, 24-hour)\\n- Active hours end time (HH:MM format, 24-hour)\\n- Reminder frequency (positive integer, in minutes)\\n- Default cup size (positive integer, in milliliters)\\n- Timestamps for tracking when settings were created and last modified\\n\\nThis is foundational infrastructure that all other configuration subtasks depend on. The schema design must support:\\n1. Single-row constraint to enforce only one settings record exists\\n2. Efficient retrieval on app startup (settings loaded once and cached)\\n3. Atomic updates when users modify settings\\n4. Clear column types and constraints that align with validation rules\\n5. Migration strategy for first-run initialization\\n\\nThe implementation should include:\\n- SQL schema definition with appropriate data types and constraints\\n- Database initialization logic that creates the table if it doesn't exist\\n- Default values insertion on first run\\n- Connection management setup for SQLite file in the app directory\\n- Error handling for database operations (file permissions, corruption, etc.)\\n\\nThis subtask establishes the persistence layer that enables all configuration management functionality. Without this schema in place, subsequent subtasks cannot store or retrieve user settings.",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:26:47.516836+00:00",
+          "updatedAt": "2026-01-19T13:26:47.516836+00:00",
+          "complexity": 3,
+          "databaseId": "70bf6542-f863-40ac-b495-a3ffff728906",
+          "scopeBoundaries": {
+            "included": "SQLite schema design and implementation for configuration storage, database initialization on first run, default values insertion, connection management, and data access layer for retrieving/updating settings",
+            "excluded": "Daemon/reminder logic, water intake logging, history viewing and export, CLI command implementation (handled by subsequent subtasks), validation logic (handled by separate subtask)"
+          },
+          "implementationApproach": "1. Create database initialization module that handles SQLite connection and schema setup\\n2. Define SQL schema with CREATE TABLE IF NOT EXISTS statement including all configuration columns, constraints, and indexes\\n3. Implement database migration logic that runs on app startup to create table if missing\\n4. Add default values insertion function that populates the single settings row with sensible defaults on first run\\n5. Create data access layer methods for retrieving and updating settings from the database\\n6. Add error handling for common database issues (file permissions, schema conflicts, concurrent access)\\n7. Write unit tests covering schema creation, default insertion, and constraint enforcement",
+          "technicalConstraints": [
+            "Single-row settings table (id=1) - no multi-user support",
+            "Settings loaded once on app startup and cached in memory for performance",
+            "No concurrent access concerns (single-user CLI app)",
+            "SQLite file location in app directory (configurable via environment variable if needed)",
+            "Time format must be consistent (HH:MM in 24-hour format)",
+            "All numeric values must be positive integers",
+            ".NET 10 framework requirement",
+            "Unit tests required for all data layer operations"
+          ],
+          "acceptanceCriteria": [
+            "SQLite settings table created with single-row constraint (id=1) and all required columns: daily_goal, active_hours_start, active_hours_end, reminder_frequency, default_cup_size, created_at, updated_at",
+            "Database initialization logic automatically creates table and inserts default values on first run (goal: 2000ml, active hours: 06:00-22:00, frequency: 60 minutes, cup size: 250ml)",
+            "Settings table enforces data type constraints: positive integers for numeric fields, HH:MM format for time fields, timestamps for audit columns",
+            "Database connection management handles SQLite file location in app directory with proper error handling for file permissions and database corruption",
+            "Unit tests verify schema creation, default value insertion, and that only one settings row can exist"
+          ],
+          "skills": [
+            "SQLite",
+            ".NET 10",
+            "Database design",
+            "Data access patterns",
+            "Unit testing"
+          ],
+          "category": "development"
+        },
+        {
+          "id": "DMA-27",
+          "parentId": "2ce67de2-4d91-490a-937f-1f89f4b1181b",
+          "title": "Build validation schemas for water intake configuration parameters",
+          "description": "Create comprehensive validation logic for all water intake configuration parameters to ensure data integrity and provide clear user feedback. This subtask focuses on implementing validation schemas that enforce business rules for each configuration setting before persistence.\n\nThe validation system must handle:\n1. Daily water goal: Positive integer in milliliters (e.g., 1500-3000ml typical range, but allow any positive value)\n2. Active hours start time: HH:MM format in 24-hour notation (00:00-23:59)\n3. Active hours end time: HH:MM format in 24-hour notation (00:00-23:59)\n4. Reminder frequency: Positive integer in minutes (e.g., 15-120 minutes typical range)\n5. Default cup size: Positive integer in milliliters (e.g., 200-500ml typical range)\n6. Cross-field validation: End time must be after start time for active hours\n\nThis subtask builds on the SQLite schema from Subtask 1 by providing the validation layer that prevents invalid data from reaching the database. The validation schemas will be used by CLI commands (Subtask 3) to validate user input before attempting to update settings.\n\nImplementation should include:\n- Fluent validation builder or data annotation approach for each parameter\n- Clear, user-friendly error messages for each validation failure\n- Support for both individual parameter validation and batch validation of all settings\n- Reusable validation methods that can be called from CLI command handlers\n- Unit tests covering valid inputs, boundary cases, and invalid inputs for each parameter\n- Cross-field validation logic for active hours (end > start)\n- Type-safe validation that works with the settings model\n\nThe validation schemas should be designed to be easily testable and maintainable, with clear separation between validation logic and CLI presentation. Error messages should guide users toward correct input format and acceptable ranges.",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:27:06.105197+00:00",
+          "updatedAt": "2026-01-19T13:27:06.105197+00:00",
+          "complexity": 4,
+          "databaseId": "89ed37f1-a960-41c6-a6bb-cc784d75a198",
+          "scopeBoundaries": {
+            "included": "Validation schemas for all water intake configuration parameters (daily goal, active hours start/end, reminder frequency, cup size), cross-field validation for active hours, error message generation, reusable validation methods for CLI integration",
+            "excluded": "CLI command implementation (belongs to Subtask 3), database persistence (handled by Subtask 1), daemon/reminder logic (Task 2), water logging (Task 3)"
+          },
+          "implementationApproach": "1. Create a WaterIntakeSettingsValidator class with methods for validating each parameter individually\\n2. Implement validation for daily_goal: ensure positive integer, return error if <= 0 or non-numeric\\n3. Implement validation for active_hours_start and active_hours_end: parse HH:MM format, validate hour (0-23) and minute (0-59) ranges\\n4. Implement validation for reminder_frequency: ensure positive integer, return error if <= 0 or non-numeric\\n5. Implement validation for default_cup_size: ensure positive integer, return error if <= 0 or non-numeric\\n6. Add cross-field validation method that checks end_time > start_time for active hours\\n7. Create ValidationResult class to return both success/failure status and specific error messages\\n8. Write comprehensive unit tests for each validator covering valid inputs, boundary values, and invalid inputs",
+          "technicalConstraints": [
+            "Time format must be HH:MM in 24-hour format (00:00-23:59)",
+            "All numeric values must be positive integers (>0)",
+            "Active hours end time must be after start time",
+            "Validation must provide specific, user-friendly error messages",
+            "Single-user CLI app - no concurrent access concerns",
+            "Validation results must be structured and reusable across CLI commands"
+          ],
+          "acceptanceCriteria": [
+            "Validation schema validates daily water goal as positive integer (>0)",
+            "Validation schema validates active hours start/end times in HH:MM 24-hour format (00:00-23:59)",
+            "Validation schema validates reminder frequency as positive integer (>0)",
+            "Validation schema validates default cup size as positive integer (>0)",
+            "Cross-field validation ensures active hours end time is after start time",
+            "Validation returns specific error messages for each failure type (e.g., 'Daily goal must be a positive number', 'End time must be after start time')",
+            "Unit tests cover valid inputs, boundary cases, and invalid inputs for all parameters",
+            "Validation methods are reusable and can be called from CLI command handlers"
+          ],
+          "skills": [
+            "C#/.NET",
+            "Validation logic",
+            "Unit testing",
+            "Error handling"
+          ],
+          "category": "development"
+        },
+        {
+          "id": "DMA-31",
+          "parentId": "2ce67de2-4d91-490a-937f-1f89f4b1181b",
+          "title": "Build CLI commands to view and update water intake configuration settings",
+          "description": "Create CLI command handlers that allow users to view current water intake settings and update individual configuration parameters. This subtask focuses on implementing the command-line interface layer that connects user input to the validation and persistence layers built in previous subtasks.\n\nThe CLI commands must support:\n1. `config --show` command to display all current settings in a readable format\n2. `config --set-goal <value>` command to update daily water goal\n3. `config --set-active-hours <start> <end>` command to update active hours window\n4. `config --set-frequency <value>` command to update reminder frequency\n5. `config --set-cup-size <value>` command to update default cup size\n\nEach command must:\n- Parse command-line arguments and options\n- Call the validation schemas from Subtask 2 to validate user input\n- Display clear error messages if validation fails, showing expected format and acceptable ranges\n- On success, persist the updated setting to the SQLite database from Subtask 1\n- Provide user-friendly confirmation messages after successful updates\n- Handle edge cases like missing arguments, invalid formats, and database errors\n\nThe implementation should follow .NET CLI patterns and integrate with the existing command infrastructure. The `config --show` command should display settings in a clear, organized format that helps users understand their current configuration. Error handling must distinguish between validation errors (user input issues) and persistence errors (database problems), providing appropriate guidance for each.\n\nThis subtask bridges the gap between the database schema and validation logic, creating the user-facing interface that enables configuration management. Without these CLI commands, users have no way to interact with the settings system despite having the underlying infrastructure in place.",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:27:31.487707+00:00",
+          "updatedAt": "2026-01-19T13:27:31.487707+00:00",
+          "complexity": 5,
+          "databaseId": "1cd70533-ce08-4907-a76b-c8b26b243faa",
+          "relevantFiles": [
+            {
+              "path": "src/Commands/ConfigCommand.cs",
+              "action": "create",
+              "description": "Main CLI command handler for all config subcommands (--show, --set-goal, --set-active-hours, --set-frequency, --set-cup-size); parses arguments and routes to appropriate handler methods"
+            },
+            {
+              "path": "src/Services/WaterIntakeSettingsValidator.cs",
+              "action": "reference",
+              "description": "Validation schema class from Subtask 2 that validates individual parameters and cross-field rules; used by ConfigCommand to validate user input before persistence"
+            },
+            {
+              "path": "src/Data/WaterIntakeSettingsRepository.cs",
+              "action": "reference",
+              "description": "Data access layer from Subtask 1 that provides methods to retrieve and update settings in SQLite database; used by ConfigCommand to persist validated settings"
+            },
+            {
+              "path": "tests/Commands/ConfigCommandTests.cs",
+              "action": "create",
+              "description": "Unit tests for ConfigCommand covering all subcommands with valid inputs, boundary cases, invalid inputs, and database error scenarios"
+            }
+          ],
+          "codebasePatterns": [
+            "Use dependency injection for accessing validator and repository services",
+            "Separate concerns: validation logic in validator, persistence in repository, CLI presentation in command handler",
+            "Return structured error messages that indicate what went wrong and expected format",
+            "Use command pattern for CLI command handling with argument parsing and routing"
+          ],
+          "existingInfrastructure": [
+            {
+              "name": "WaterIntakeSettingsValidator",
+              "usage": "Inject into ConfigCommand constructor; call ValidateDailyGoal(), ValidateActiveHours(), ValidateReminderFrequency(), ValidateDefaultCupSize() methods to validate user input before persistence",
+              "location": "src/Services/WaterIntakeSettingsValidator.cs"
+            },
+            {
+              "name": "WaterIntakeSettingsRepository",
+              "usage": "Inject into ConfigCommand constructor; call GetSettings() to retrieve current settings for --show command, call UpdateDailyGoal(), UpdateActiveHours(), UpdateReminderFrequency(), UpdateDefaultCupSize() methods to persist validated changes",
+              "location": "src/Data/WaterIntakeSettingsRepository.cs"
+            }
+          ],
+          "scopeBoundaries": {
+            "included": "CLI command handlers for viewing and updating water intake configuration settings; argument parsing and routing; integration with validation and persistence layers; error handling and user-friendly messages; unit tests for all command scenarios",
+            "excluded": "Daemon/reminder logic (Task 2); Water intake logging (Task 3); History viewing and export (Task 4); Database schema design (Subtask 1); Validation schema implementation (Subtask 2)"
+          },
+          "implementationApproach": "1. Create ConfigCommand class that inherits from base Command class and implements ICommand interface\\n2. Implement ParseArguments method to extract subcommand (--show, --set-goal, etc.) and associated values from command-line args\\n3. Implement ExecuteShowCommand method that retrieves current settings from WaterIntakeSettingsRepository and formats them for display (e.g., \\\"Daily Goal: 2000 ml\\\\nActive Hours: 06:00-22:00\\\\nReminder Frequency: 60 minutes\\\\nCup Size: 250 ml\\\")\\n4. Implement ExecuteSetGoalCommand method that: parses the value argument, calls WaterIntakeSettingsValidator.ValidateDailyGoal(), displays error if invalid, calls repository.UpdateDailyGoal() if valid, displays confirmation message\\n5. Implement ExecuteSetActiveHoursCommand method that: parses start and end time arguments, calls WaterIntakeSettingsValidator.ValidateActiveHours(), displays error if invalid, calls repository.UpdateActiveHours() if valid\\n6. Implement ExecuteSetFrequencyCommand method that: parses frequency value, validates using WaterIntakeSettingsValidator.ValidateReminderFrequency(), persists if valid\\n7. Implement ExecuteSetCupSizeCommand method that: parses cup size value, validates using WaterIntakeSettingsValidator.ValidateDefaultCupSize(), persists if valid\\n8. Add error handling wrapper that catches database exceptions and displays user-friendly error messages\\n9. Write unit tests for each command handler covering: valid inputs, boundary values, invalid inputs, missing arguments, database errors",
+          "technicalConstraints": [
+            "Must use .NET 10 and C# language features",
+            "CLI commands must follow standard command-line argument parsing conventions",
+            "Time format must be consistent (HH:MM in 24-hour format)",
+            "All numeric values must be positive integers",
+            "Settings table has single row (id=1) - no multi-user support",
+            "Single-user CLI app with no concurrent access concerns"
+          ],
+          "acceptanceCriteria": [
+            "User can execute 'config --show' command to display all current water intake settings in readable format (daily goal in ml, active hours in HH:MM-HH:MM format, reminder frequency in minutes, cup size in ml)",
+            "User can execute 'config --set-goal <value>' command to update daily water goal; command validates input using WaterIntakeSettingsValidator and persists to SQLite database",
+            "User can execute 'config --set-active-hours <start> <end>' command to update active hours; command validates both times are in HH:MM format and end time is after start time",
+            "User can execute 'config --set-frequency <value>' command to update reminder frequency; command validates input is positive integer and persists to database",
+            "User can execute 'config --set-cup-size <value>' command to update default cup size; command validates input is positive integer and persists to database",
+            "Invalid input to any config command displays specific error message indicating what went wrong (e.g., 'Daily goal must be a positive number', 'End time must be after start time') and shows expected format",
+            "Successful config update displays confirmation message showing the new value that was set",
+            "Database errors during config update are caught and displayed to user with helpful guidance (e.g., 'Failed to save settings, please check file permissions')",
+            "Unit tests verify each config command with valid inputs, boundary values, and invalid inputs",
+            "Unit tests verify that settings persist across multiple command executions and app restarts"
+          ],
+          "skills": [
+            "C#/.NET",
+            "CLI argument parsing",
+            "Command pattern",
+            "Error handling",
+            "User experience design"
+          ],
+          "category": "development"
+        }
+      ],
+      "createdAt": "2026-01-19T13:26:29.816142+00:00",
+      "updatedAt": "2026-01-19T13:27:31.812+00:00",
+      "blocks": [
+        "DMA-17",
+        "DMA-18"
+      ]
+    },
+    {
+      "id": "DMA-17",
+      "title": "Water reminders can be delivered on a schedule within active hours",
+      "description": "Users can run a daemon that sends periodic water intake reminders during their configured active hours, showing how much they need to drink.",
+      "status": "pending",
+      "priority": "high",
+      "dependencies": [
+        "DMA-16"
+      ],
+      "details": "**User Capability**: Users can start a background daemon that sends periodic water intake reminders during their configured active hours, with each reminder showing how much water they still need to drink.\n\n**Business Value**: Passive reminders are the core value of the app. Without them, users must manually check their progress. A daemon ensures consistent, timely prompts that help users build hydration habits without external dependencies (no push notifications, no cloud).\n\n**Functional Requirements**:\n- Daemon process that runs continuously\n- Check current time against active hours (from settings)\n- Send reminder at configured interval (from settings)\n- Reminder must show: current time, remaining ml to reach goal, suggested amount\n- Reminder output: console text + beep sound\n- Track next scheduled reminder time\n- Graceful shutdown on user interrupt (Ctrl+C)\n- Prevent multiple daemon instances running simultaneously\n- Status command shows if daemon is running and next reminder time\n\n**Data Model & Structure**:\n- No new tables needed (uses settings and water_events from other tasks)\n- Runtime state: next_reminder_time (calculated, not persisted)\n- Daemon state file (optional): .daemon_pid or similar to track running process\n\n**Technical Approach**:\n- Domain layer: ReminderScheduler class with logic for calculating next reminder time\n- Domain layer: ActiveHoursValidator to check if current time is within active window\n- Application layer: DaemonService managing reminder loop and timing\n- Infrastructure layer: ConsoleReminderNotifier for text output + beep\n- Infrastructure layer: ProcessLockManager to prevent multiple daemon instances\n- CLI layer: DaemonCommand with start/stop subcommands\n- Use System.Threading.Timer or Task.Delay for scheduling\n- Use Console.Beep() for audio notification\n- Use file-based lock (.daemon_pid) to prevent multiple instances\n\n**User Workflows**:\n1. User runs `hidratacao daemon` → daemon starts, displays \"Daemon started, next reminder at HH:MM\"\n2. Daemon enters loop: sleep until next reminder time\n3. At reminder time, daemon checks if current time is within active hours\n4. If within active hours: calculate remaining ml, display reminder, beep, calculate next reminder time\n5. If outside active hours: skip reminder, calculate next reminder time within active hours\n6. User runs `hidratacao status` → shows \"Daemon running, next reminder at HH:MM\"\n7. User presses Ctrl+C → daemon shuts down gracefully, removes lock file\n8. User runs `hidratacao daemon` again → starts new daemon instance\n\nEdge cases:\n- Active hours span midnight (e.g., 22:00-06:00) → handle day boundary correctly\n- User changes settings while daemon is running → daemon should reload settings (or restart required)\n- Daemon crashes → lock file cleanup on restart\n- Multiple daemon start attempts → second attempt fails with \"Daemon already running\"\n- Reminder time falls outside active hours → skip and schedule next reminder within active hours\n- User logs water during reminder → next reminder still fires at scheduled time\n\n**API/Interface Specifications**:\n- CLI Commands:\n  - `hidratacao daemon` → starts daemon, displays startup message\n  - `hidratacao daemon --stop` → stops running daemon\n  - `hidratacao status` → shows daemon status and next reminder time\n- Domain Service: `IReminderScheduler.GetNextReminderTime(lastReminderTime, intervalMinutes, activeHoursStart, activeHoursEnd) -> DateTime`\n- Domain Service: `IActiveHoursValidator.IsWithinActiveHours(currentTime, activeHoursStart, activeHoursEnd) -> bool`\n- Application Service: `IDaemonService.Start() -> void`, `IDaemonService.Stop() -> void`, `IDaemonService.IsRunning() -> bool`\n- Notifier: `IReminderNotifier.SendReminder(currentTime, remainingMl, suggestedMl) -> void`\n\n**Scope - INCLUDED**:\n- Daemon process management (start/stop)\n- Reminder scheduling logic\n- Active hours validation\n- Console output + beep notification\n- Process lock to prevent multiple instances\n- Status command to show daemon state\n- Graceful shutdown handling\n\n**Scope - EXCLUDED**:\n- Configuration (Task 1)\n- Water logging (Task 3)\n- History and export (Task 4)\n- System push notifications\n- Persistent daemon (survives app restart)\n\n**Success Criteria**:\n- Daemon starts and runs continuously\n- Reminders are sent at correct interval\n- Reminders only occur within active hours\n- Reminder message shows correct remaining ml\n- Beep sound plays with each reminder\n- Only one daemon instance can run at a time\n- Daemon stops cleanly on Ctrl+C\n- Status command correctly reports daemon state\n- Unit tests verify reminder scheduling logic\n- Unit tests verify active hours validation\n- Unit tests verify next reminder calculation with edge cases (midnight boundary)\n\n**Constraints & Considerations**:\n- Console-based notification only (no system integration)\n- Beep uses Console.Beep() - may not work on all terminals\n- Daemon runs in foreground (user must keep terminal open or use background process manager)\n- No persistence of daemon state across restarts\n- Active hours spanning midnight requires special handling\n- Timer precision: reminders may be ±1 second due to system scheduling\n- Single-threaded reminder loop (no concurrent operations)\n- Settings changes require daemon restart to take effect\n- Lock file cleanup on abnormal termination may require manual cleanup",
+      "testStrategy": "",
+      "subtasks": [
+        {
+          "id": "DMA-22",
+          "parentId": "e90e2544-26e2-43c1-b729-0dd4bb0d3187",
+          "title": "Build daemon process manager with start/stop lifecycle and single-instance lock",
+          "description": "Create the core daemon process management infrastructure that enables the water reminder system to run as a background service. This subtask focuses on establishing the daemon lifecycle (start, run, stop) with proper process locking to prevent multiple concurrent instances.\\n\\nThe daemon manager must:\\n1. Implement a DaemonManager class that orchestrates the reminder service lifecycle\\n2. Create a file-based lock mechanism using a lock file (e.g., .hydration-daemon.lock) to ensure only one daemon instance runs at a time\\n3. Handle daemon startup by acquiring the lock, initializing the reminder scheduler, and entering the main event loop\\n4. Implement graceful shutdown on Ctrl+C (SIGINT) that releases the lock and cleans up resources\\n5. Provide status checking to determine if a daemon is currently running (by checking lock file existence and process validity)\\n6. Integrate with the existing Settings service to read active hours and reminder interval configuration\\n7. Implement proper error handling for lock acquisition failures (e.g., daemon already running) with user-friendly error messages\\n\\nThis is foundational work that other daemon-related subtasks (reminder scheduling, active hours validation, notifications) will build upon. The lock mechanism is critical for preventing multiple daemon instances from sending duplicate reminders or causing race conditions.\\n\\nKey technical decisions:\\n- Use file-based locking (simpler than OS-level locks, cross-platform compatible)\\n- Lock file stored in user's home directory or app data folder\\n- Daemon runs in foreground (user keeps terminal open or uses external process manager)\\n- Graceful shutdown via Console.CancelKeyPress event handler\\n- Status command queries lock file to report daemon state without requiring inter-process communication\\n\\nThe implementation should follow .NET 10 patterns with dependency injection for the Settings service and proper async/await for the main loop.",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:26:45.58633+00:00",
+          "updatedAt": "2026-01-19T13:26:45.58633+00:00",
+          "complexity": 4,
+          "databaseId": "89d434bd-6318-46f8-8c84-a3b9d0eb7f8c",
+          "scopeBoundaries": {
+            "included": "Daemon process management (start/stop), process lock to prevent multiple instances, graceful shutdown handling, status command to show daemon state",
+            "excluded": "Configuration (handled by Sibling 2), water logging (handled by Sibling 4), reminder scheduling logic (separate subtask), active hours validation (separate subtask), console output and beep notifications (separate subtask)"
+          },
+          "implementationApproach": "1. Create DaemonManager class in Services folder with methods: Start(), Stop(), IsRunning()\\n2. Implement file-based lock mechanism using Path.Combine(Environment.GetFolderPath(SpecialFolder.UserProfile), \\\".hydration-daemon.lock\\\")\\n3. In Start(): acquire lock (throw if already exists), initialize ReminderScheduler, enter main loop with Timer\\n4. Register Console.CancelKeyPress handler to call Stop() and set exit flag\\n5. In Stop(): cancel timer, release lock file, log shutdown message\\n6. In IsRunning(): check if lock file exists and is valid (not stale)\\n7. Inject ISettingsService to read active hours and interval on startup\\n8. Add unit tests for lock acquisition/release, concurrent start attempts, and graceful shutdown",
+          "technicalConstraints": [
+            "Console-based notification only (no system integration)",
+            "Daemon runs in foreground (user must keep terminal open or use background process manager)",
+            "No persistence of daemon state across restarts",
+            "Single-threaded reminder loop (no concurrent operations)",
+            "Settings changes require daemon restart to take effect",
+            "Lock file cleanup on abnormal termination may require manual cleanup",
+            ".NET 10 framework requirements"
+          ],
+          "acceptanceCriteria": [
+            "DaemonManager class successfully acquires lock file on startup and prevents second instance from starting",
+            "Daemon gracefully shuts down on Ctrl+C, releasing lock file and stopping reminder loop",
+            "Status command correctly reports daemon running/not running by checking lock file existence",
+            "Lock file is created in appropriate location (home directory or app data folder) with process ID or timestamp",
+            "Error message displayed when attempting to start daemon while one is already running",
+            "Unit tests verify lock acquisition, release, and conflict detection logic",
+            "Daemon integrates with Settings service to read active hours and interval configuration on startup"
+          ],
+          "skills": [
+            "C#/.NET 10",
+            "File I/O and locking",
+            "Process management",
+            "Dependency injection",
+            "Unit testing",
+            "Signal handling (Ctrl+C)"
+          ],
+          "category": "development"
+        },
+        {
+          "id": "DMA-26",
+          "parentId": "e90e2544-26e2-43c1-b729-0dd4bb0d3187",
+          "title": "Build reminder scheduling engine with interval-based timing logic",
+          "description": "Create the core reminder scheduling logic that calculates when reminders should fire based on the configured interval and active hours. This subtask implements the scheduling engine that determines the next reminder time, validates whether a reminder should be sent at the current moment, and handles the timing calculations that drive the daemon's main loop.\\n\\nThe scheduling engine must:\\n1. Calculate the next reminder time based on the current time and configured interval (e.g., every 30 minutes)\\n2. Determine if a reminder should be sent right now by comparing current time against the next scheduled time\\n3. Handle edge cases like reminders that should have fired while daemon was stopped (catch-up logic)\\n4. Calculate remaining time until the next reminder for status display\\n5. Support active hours that span midnight (e.g., 6 AM to 2 AM next day)\\n6. Provide deterministic, testable scheduling logic that doesn't depend on system clock precision\\n\\nThis scheduling engine is critical because it controls the timing of all reminders. The DaemonManager (from Subtask 1) will use this engine's methods to determine when to send reminders and how long to wait between checks. The engine must be thoroughly tested with edge cases like midnight boundaries, interval boundaries, and various active hour configurations.\\n\\nKey technical decisions:\\n- Separate scheduling logic from daemon lifecycle (single responsibility)\\n- Use DateTime.Now for current time (allows mocking in tests)\\n- Return next scheduled time as DateTime for flexibility\\n- Implement active hours validation as part of scheduling (not separate)\\n- Support configurable interval from Settings service\\n- Handle catch-up reminders (if daemon was stopped, send reminder immediately if overdue)\\n\\nThe implementation should follow .NET patterns with dependency injection for the Settings service, and provide clear, testable methods that the DaemonManager can call in its main loop. All scheduling calculations must be deterministic and thoroughly unit tested with various time scenarios.",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:27:05.479311+00:00",
+          "updatedAt": "2026-01-19T13:27:05.479311+00:00",
+          "complexity": 6,
+          "databaseId": "21682152-e223-4f85-97b1-e985b92a9311",
+          "relevantFiles": [
+            {
+              "path": "Services/ReminderScheduler.cs",
+              "action": "create",
+              "description": "Core scheduling engine that calculates next reminder time, validates active hours, and determines if reminder should fire"
+            },
+            {
+              "path": "Services/DaemonManager.cs",
+              "action": "modify",
+              "description": "Integrate ReminderScheduler into main loop to call ShouldSendReminder() on each iteration"
+            },
+            {
+              "path": "Services/ISettingsService.cs",
+              "action": "reference",
+              "description": "Read interval and active hours configuration"
+            }
+          ],
+          "codebasePatterns": [
+            "Dependency injection for service dependencies",
+            "Deterministic, testable scheduling logic",
+            "Separation of concerns (scheduling logic separate from daemon lifecycle)",
+            "DateTime.Now for current time (allows mocking in tests)"
+          ],
+          "scopeBoundaries": {
+            "included": "Reminder scheduling logic that calculates when reminders should fire based on configured interval and active hours, including edge case handling for midnight-spanning active hours and catch-up logic",
+            "excluded": "Configuration storage (Task 1), water logging (Task 3), history and export (Task 4), system push notifications, persistent daemon state, console output/beep notification (separate subtask)"
+          },
+          "implementationApproach": "1. Create ReminderScheduler class in Services folder with dependency on ISettingsService\\n2. Implement GetNextReminderTime(DateTime lastReminderTime) method that adds configured interval to last reminder time\\n3. Implement ShouldSendReminder(DateTime currentTime, DateTime nextScheduledTime) that checks if current time >= next scheduled time\\n4. Implement IsWithinActiveHours(DateTime time) method that validates time against active hours, handling midnight-spanning ranges\\n5. Implement GetTimeUntilNextReminder(DateTime currentTime, DateTime nextScheduledTime) for status display\\n6. Add catch-up logic: if daemon starts and current time > next scheduled time, return true immediately\\n7. Create comprehensive unit tests covering: standard intervals, active hours boundaries, midnight spanning, catch-up scenarios, and edge cases\\n8. Integrate ReminderScheduler into DaemonManager's main loop to call ShouldSendReminder() on each iteration",
+          "technicalConstraints": [
+            "Console-based notification only (no system integration)",
+            "Timer precision: reminders may be ±1 second due to system scheduling",
+            "Single-threaded reminder loop (no concurrent operations)",
+            "Settings changes require daemon restart to take effect",
+            "Active hours spanning midnight requires special handling"
+          ],
+          "acceptanceCriteria": [
+            "ReminderScheduler calculates next reminder time correctly based on interval (e.g., 30-minute intervals starting from last reminder)",
+            "ShouldSendReminder() returns true when current time >= next scheduled time and within active hours",
+            "ShouldSendReminder() returns false when outside active hours, even if interval has elapsed",
+            "Active hours spanning midnight (e.g., 6 AM to 2 AM) are correctly validated for times near midnight boundary",
+            "Catch-up logic sends reminder immediately if daemon restarts and current time is past the next scheduled reminder time",
+            "Unit tests verify scheduling with various intervals (15, 30, 60 minutes) and active hour configurations",
+            "Unit tests verify midnight boundary handling with active hours like 22:00-06:00",
+            "GetTimeUntilNextReminder() returns accurate duration for status display",
+            "Scheduling logic integrates with ISettingsService to read interval and active hours configuration"
+          ],
+          "skills": [
+            "C# / .NET 10",
+            "DateTime handling",
+            "Unit testing",
+            "Dependency injection",
+            "Edge case handling"
+          ],
+          "category": "development"
+        },
+        {
+          "id": "DMA-30",
+          "parentId": "e90e2544-26e2-43c1-b729-0dd4bb0d3187",
+          "title": "Validate active hours and send reminders only within configured time windows",
+          "description": "Implement active hours validation logic that ensures reminders are only sent during the user's configured active hours window. This subtask builds on the ReminderScheduler from Subtask 2 by adding the critical filtering layer that prevents reminders from being sent outside the active hours range.\\n\\nThe active hours validation must:\\n1. Check if the current time falls within the configured active hours range (e.g., 6 AM to 11 PM)\\n2. Handle the edge case where active hours span midnight (e.g., 10 PM to 6 AM next day)\\n3. Integrate with the existing Settings service to read the active hours configuration\\n4. Return a boolean indicating whether a reminder should be sent at the current moment\\n5. Provide clear logic that can be tested with various time scenarios and active hour configurations\\n6. Work seamlessly with the ReminderScheduler's ShouldSendReminder() method to create a complete filtering pipeline\\n\\nThis validation is essential because users need control over when they receive reminders - they may not want reminders during sleep hours or work hours. The daemon's main loop will call this validation method on each iteration to determine if a reminder should be sent, even if the interval has elapsed.\\n\\nKey technical decisions:\\n- Implement IsWithinActiveHours() as a dedicated method in ReminderScheduler for clarity\\n- Use TimeOnly struct (.NET 6+) for time comparisons to avoid date-related complications\\n- Handle midnight-spanning ranges by checking if time is >= start OR time is < end (when start > end)\\n- Parse active hours from Settings service as TimeSpan or string format (e.g., \\\"06:00-23:00\\\")\\n- Return false immediately if outside active hours, regardless of interval status\\n- Provide comprehensive unit tests covering standard ranges, midnight boundaries, and edge times (00:00, 23:59)\\n\\nThe implementation should follow .NET patterns with proper time handling, clear method naming, and thorough test coverage. This validation layer is critical for user experience - reminders sent outside active hours would be frustrating and defeat the purpose of the configuration.\\n\\nIntegration points:\\n- ReminderScheduler.IsWithinActiveHours() is called by ShouldSendReminder() before returning true\\n- DaemonManager's main loop relies on this validation to filter reminders\\n- Settings service provides the active hours configuration (start time and end time)\\n- Unit tests verify behavior with various active hour configurations and current times",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:27:29.332585+00:00",
+          "updatedAt": "2026-01-19T13:27:29.332585+00:00",
+          "complexity": 4,
+          "databaseId": "6704d3e2-1624-4d65-85a7-602b53fcd831",
+          "relevantFiles": [
+            {
+              "path": "Services/ReminderScheduler.cs",
+              "action": "modify",
+              "description": "Extend with IsWithinActiveHours() method that validates current time against active hours configuration, handling midnight-spanning ranges"
+            },
+            {
+              "path": "Services/ReminderScheduler.cs",
+              "action": "modify",
+              "description": "Unit tests for active hours validation covering standard ranges, midnight boundaries, and edge cases"
+            }
+          ],
+          "codebasePatterns": [
+            "Dependency injection for ISettingsService",
+            "TimeOnly struct for time comparisons",
+            "Unit testing with edge cases",
+            "Single responsibility principle"
+          ],
+          "existingInfrastructure": [
+            {
+              "name": "ISettingsService",
+              "usage": "Inject into ReminderScheduler to read active hours configuration (start time and end time)",
+              "location": "Services/ISettingsService.cs"
+            },
+            {
+              "name": "ReminderScheduler",
+              "usage": "Extend with IsWithinActiveHours() method and integrate into ShouldSendReminder() logic",
+              "location": "Services/ReminderScheduler.cs"
+            }
+          ],
+          "scopeBoundaries": {
+            "included": "Active hours validation logic that filters reminders to only send within configured time windows, including handling midnight-spanning ranges and edge cases",
+            "excluded": "Configuration storage (handled by Sibling 2), water logging (Sibling 4), system push notifications, persistent daemon state"
+          },
+          "implementationApproach": "1. Extend ReminderScheduler class with IsWithinActiveHours(DateTime currentTime) method\\n2. Read active hours from ISettingsService (assuming format like \\\"06:00-23:00\\\" or separate start/end times)\\n3. Parse active hours into TimeOnly objects for comparison (use TimeOnly.Parse() or similar)\\n4. Implement logic: if start < end (normal range), check if currentTime.TimeOfDay >= start AND currentTime.TimeOfDay <= end; if start > end (midnight-spanning), check if currentTime.TimeOfDay >= start OR currentTime.TimeOfDay < end\\n5. Modify ShouldSendReminder() to call IsWithinActiveHours() and return false if outside active hours\\n6. Add comprehensive unit tests: standard ranges (06:00-23:00), midnight-spanning (22:00-06:00), edge times (00:00, 23:59, exactly at boundaries)\\n7. Test integration with DaemonManager to verify reminders are filtered correctly during main loop execution\"",
+          "technicalConstraints": [
+            "Must handle active hours spanning midnight (e.g., 22:00-06:00)",
+            "Time comparisons must be deterministic and testable",
+            "Active hours configuration must be read from ISettingsService",
+            "Reminders must be completely blocked outside active hours, regardless of interval status",
+            "Timer precision: reminders may be ±1 second due to system scheduling"
+          ],
+          "acceptanceCriteria": [
+            "IsWithinActiveHours() returns true when current time is between start and end times (e.g., 10:00 AM within 06:00-23:00)",
+            "IsWithinActiveHours() returns false when current time is outside active hours (e.g., 2:00 AM outside 06:00-23:00)",
+            "Active hours spanning midnight (e.g., 22:00-06:00) correctly validate times near midnight boundary (e.g., 23:00 returns true, 05:00 returns true, 07:00 returns false)",
+            "ShouldSendReminder() returns false when outside active hours, even if interval has elapsed",
+            "Unit tests verify active hours validation with at least 5 different time scenarios including midnight boundaries",
+            "Active hours configuration is read from ISettingsService and applied consistently",
+            "Edge cases handled: exactly at start time, exactly at end time, midnight (00:00), end of day (23:59)"
+          ],
+          "skills": [
+            "C#/.NET",
+            "Time handling and edge cases",
+            "Unit testing",
+            "Logic validation"
+          ],
+          "category": "development"
+        },
+        {
+          "id": "DMA-33",
+          "parentId": "e90e2544-26e2-43c1-b729-0dd4bb0d3187",
+          "title": "Deliver reminder notifications with console output and beep alert",
+          "description": "Implement the notification delivery mechanism that sends water intake reminders to the user through console output and audio feedback. This subtask focuses on creating the actual reminder message that gets displayed to the user and the beep sound that alerts them, integrating with the scheduling logic from previous subtasks.\\n\\nThe notification delivery system must:\\n1. Create a ReminderNotifier class that formats and displays reminder messages to the console\\n2. Calculate the remaining water intake amount based on the daily goal and current logged amount\\n3. Display a user-friendly reminder message showing how much water the user needs to drink (e.g., \\\"Reminder: You need to drink 500ml more water today\\\")\\n4. Play a beep sound using Console.Beep() to alert the user audibly\\n5. Integrate with the existing logging/tracking system to retrieve the current day's water intake\\n6. Handle edge cases like when daily goal is already met (show congratulatory message instead)\\n7. Log each reminder sent for debugging and status reporting\\n\\nThis notification delivery is the final step in the reminder pipeline - after the DaemonManager determines it's time to send a reminder and the ReminderScheduler validates the timing and active hours, the ReminderNotifier will actually deliver the message to the user. The message must be clear, actionable, and include the specific amount of water remaining to reach the daily goal.\\n\\nKey technical decisions:\\n- Separate notification formatting from daemon lifecycle (single responsibility)\\n- Use Console.Beep() for audio alert (simple, cross-platform, no external dependencies)\\n- Retrieve current day's water intake from the logging service to calculate remaining amount\\n- Format message to be concise but informative (fits in typical terminal width)\\n- Include timestamp in console output for reference\\n- Provide testable methods that can be mocked in unit tests\\n- Handle case where daily goal is already met (no negative remaining amounts)\\n\\nThe implementation should follow .NET patterns with dependency injection for the logging/tracking service and Settings service. The ReminderNotifier will be called by the DaemonManager's main loop after scheduling and active hours validation confirm a reminder should be sent. All message formatting and calculations must be thoroughly unit tested with various daily goal and logged amount scenarios.\\n\\nIntegration points:\\n- DaemonManager calls ReminderNotifier.SendReminder() after ShouldSendReminder() returns true\\n- ReminderNotifier queries the logging service to get current day's water intake\\n- ReminderNotifier reads daily goal from Settings service\\n- Console output includes timestamp and remaining ml amount\\n- Beep provides immediate audio feedback\\n- Unit tests verify message formatting with various goal/logged combinations",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:27:51.804094+00:00",
+          "updatedAt": "2026-01-19T13:27:51.804094+00:00",
+          "complexity": 3,
+          "databaseId": "f670d3ba-497e-45c2-966d-59ca4125829c",
+          "relevantFiles": [
+            {
+              "path": "Services/ReminderNotifier.cs",
+              "action": "create",
+              "description": "New service class that formats and delivers reminder notifications to console with beep alert"
+            },
+            {
+              "path": "Services/DaemonManager.cs",
+              "action": "modify",
+              "description": "Existing daemon manager that will call ReminderNotifier.SendReminder() after scheduling validation"
+            },
+            {
+              "path": "Services/ReminderScheduler.cs",
+              "action": "reference",
+              "description": "Existing scheduler that provides timing validation before ReminderNotifier is called"
+            },
+            {
+              "path": "Services/ISettingsService.cs",
+              "action": "reference",
+              "description": "Existing settings service to retrieve daily goal configuration"
+            }
+          ],
+          "codebasePatterns": [
+            "Dependency injection for service dependencies",
+            "Single responsibility principle (notification delivery only)",
+            "Testable methods with clear inputs and outputs",
+            "Consistent timestamp formatting",
+            "Error handling for missing settings"
+          ],
+          "existingInfrastructure": [
+            {
+              "name": "ISettingsService",
+              "usage": "Inject into ReminderNotifier constructor to retrieve daily goal configuration via GetDailyGoal() or similar method",
+              "location": "Services/ISettingsService.cs"
+            },
+            {
+              "name": "DaemonManager",
+              "usage": "Call ReminderNotifier.SendReminder() in the main loop after ShouldSendReminder() returns true and active hours are validated",
+              "location": "Services/DaemonManager.cs"
+            },
+            {
+              "name": "ReminderScheduler",
+              "usage": "ReminderScheduler provides timing validation; ReminderNotifier is called only after scheduling confirms reminder should be sent",
+              "location": "Services/ReminderScheduler.cs"
+            }
+          ],
+          "scopeBoundaries": {
+            "included": "Notification delivery mechanism that sends water intake reminders through console output and beep alert, including message formatting with remaining ml calculation and integration with logging service to retrieve current day's water intake",
+            "excluded": "Configuration storage (Task 1), water logging and undo (Task 3), history and export (Task 4), system push notifications, persistent daemon state"
+          },
+          "implementationApproach": "1. Create ReminderNotifier class in Services folder with dependencies on ISettingsService and logging service\\n2. Implement SendReminder() method that: retrieves daily goal from ISettingsService, queries logging service for current day's total, calculates remaining ml (goal - logged), formats message with timestamp\\n3. Call Console.Beep() to play audio alert (default frequency 1000Hz, duration 500ms)\\n4. Handle edge case: if logged >= goal, display congratulatory message instead of remaining amount\\n5. Log reminder sent (timestamp, remaining ml) for debugging\\n6. Integrate into DaemonManager's main loop: call ReminderNotifier.SendReminder() after ShouldSendReminder() returns true\\n7. Create unit tests: verify message formatting, remaining ml calculation with various scenarios (0ml logged, 500ml logged, goal met), verify beep is called, verify edge cases handled correctly",
+          "technicalConstraints": [
+            "Console-based notification only (no system integration)",
+            "Console.Beep() may not work on all terminals",
+            "Beep uses default frequency 1000Hz and duration 500ms",
+            "Single-threaded reminder delivery",
+            "Message must fit within typical terminal width (80-120 characters)",
+            "Remaining ml calculation must never be negative"
+          ],
+          "acceptanceCriteria": [
+            "ReminderNotifier.SendReminder() displays console message with timestamp and remaining ml amount",
+            "Console message format is clear and user-friendly (e.g., 'Reminder: You need to drink 500ml more water today')",
+            "Console.Beep() is called with each reminder to provide audio alert",
+            "Remaining ml is calculated correctly as (daily goal - current logged amount)",
+            "When daily goal is already met, message shows congratulatory text instead of remaining amount",
+            "ReminderNotifier integrates with logging service to retrieve current day's water intake",
+            "ReminderNotifier reads daily goal from ISettingsService",
+            "Unit tests verify message formatting with various goal/logged combinations (e.g., 0ml logged, 500ml logged, goal already met)",
+            "Unit tests verify remaining ml calculation is never negative",
+            "Beep sound plays without errors on supported platforms"
+          ],
+          "skills": [
+            "C#/.NET",
+            "Console I/O",
+            "Service architecture",
+            "Dependency injection",
+            "Unit testing"
+          ],
+          "category": "development"
+        }
+      ],
+      "createdAt": "2026-01-19T13:26:30.066125+00:00",
+      "updatedAt": "2026-01-19T13:27:52.127+00:00",
+      "blocks": []
+    },
+    {
+      "id": "DMA-18",
+      "title": "Water intake can be logged with flexible entry methods and undo capability",
+      "description": "Users can record water consumption by specifying milliliters or using a default cup size, with the ability to undo the last entry if they make a mistake.",
+      "status": "pending",
+      "priority": "high",
+      "dependencies": [
+        "DMA-16"
+      ],
+      "details": "**User Capability**: Users can log water intake by specifying milliliters or using a default cup size, view their updated daily total, and undo the last entry if they make a mistake.\n\n**Business Value**: Logging is the core data collection mechanism. Without it, the app can't track progress or show history. Users need quick, flexible entry methods (exact ml or cups) and error correction (undo) to make logging frictionless and reliable.\n\n**Functional Requirements**:\n- Accept water log entries with amount in milliliters\n- Support cup-based logging using default cup size from settings\n- Support logging multiple cups in one command\n- Store each entry with timestamp (UTC)\n- Display confirmation after each log (amount logged, new daily total)\n- Undo last entry from current day only\n- Prevent undo if no entries exist for today\n- Validate input: amount must be positive integer\n- Persist all entries to database\n- Calculate daily total from all entries for the day\n\n**Data Model & Structure**:\n- Table: `water_events`\n  - id (int, primary key, auto-increment)\n  - timestamp_utc (datetime, not null, indexed)\n  - ml (int, not null, must be > 0)\n  - created_at (datetime, default current_utc_timestamp)\n- Index on timestamp_utc for efficient daily queries\n- No soft deletes; undo physically removes the row\n- Daily summary can be calculated via query: SELECT SUM(ml) FROM water_events WHERE DATE(timestamp_utc) = TODAY\n\n**Technical Approach**:\n- Domain layer: WaterEntry value object with validation (ml > 0)\n- Domain layer: WaterLog aggregate with methods: AddEntry(ml), UndoLastEntry()\n- Application layer: WaterLoggingService with Log(ml) and Undo() methods\n- Application layer: DailyProgressCalculator to compute total, remaining, percentage\n- Infrastructure layer: SQLiteWaterEventRepository implementing IWaterEventRepository\n- CLI layer: LogCommand with arguments for ml amount and --cup flags\n- Use DateTime.UtcNow for all timestamps\n\n**User Workflows**:\n1. User runs `hidratacao log 250` → validates input, creates WaterEntry(250ml, now), saves to database, displays \"Logged 250ml. Today: 250ml / 2000ml (12%)\"\n2. User runs `hidratacao log --cup` → reads default_cup_ml from settings (e.g., 250), creates WaterEntry(250ml, now), saves, displays \"Logged 250ml (1 cup). Today: 500ml / 2000ml (25%)\"\n3. User runs `hidratacao log --cup 2` → calculates 2 * 250 = 500ml, creates WaterEntry(500ml, now), saves, displays \"Logged 500ml (2 cups). Today: 1000ml / 2000ml (50%)\"\n4. User realizes mistake and runs `hidratacao undo` → finds last entry for today, deletes it, displays \"Undone last entry (500ml). Today: 500ml / 2000ml (25%)\"\n5. User runs `hidratacao undo` again → deletes next-to-last entry, displays \"Undone last entry (250ml). Today: 250ml / 2000ml (12%)\"\n6. User runs `hidratacao undo` with no entries → displays \"No entries to undo\"\n7. User closes app and reopens → all entries persist in database\n\nEdge cases:\n- User logs 0ml → reject with \"Amount must be greater than 0\"\n- User logs negative number → reject with \"Amount must be greater than 0\"\n- User logs non-integer → reject with \"Amount must be a whole number\"\n- User logs at 23:59 and again at 00:01 → first entry belongs to yesterday, second to today\n- User runs undo at midnight → only undoes entries from current day (after midnight)\n- User runs undo with no entries today → display \"No entries to undo\"\n- User runs undo after logging yesterday → doesn't affect yesterday's entries\n- Concurrent log attempts (unlikely in CLI, but handle gracefully) → use database transaction\n\n**API/Interface Specifications**:\n- CLI Commands:\n  - `hidratacao log <ml>` → logs specified milliliters\n  - `hidratacao log --cup [count]` → logs count cups (default 1)\n  - `hidratacao undo` → removes last entry from today\n- Domain Service: `IWaterLog.AddEntry(ml) -> void`, `IWaterLog.UndoLastEntry() -> void`, `IWaterLog.GetTodayTotal() -> int`\n- Application Service: `IWaterLoggingService.LogWater(ml) -> LogResult`, `IWaterLoggingService.UndoLastEntry() -> UndoResult`\n- Repository: `IWaterEventRepository.AddEvent(timestamp, ml) -> void`, `IWaterEventRepository.GetTodayEvents() -> List<WaterEvent>`, `IWaterEventRepository.DeleteEvent(id) -> void`, `IWaterEventRepository.GetLastEventForToday() -> WaterEvent`\n- Response objects:\n  - LogResult: { AmountLogged: int, DailyTotal: int, DailyGoal: int, Percentage: decimal }\n  - UndoResult: { AmountRemoved: int, DailyTotal: int, DailyGoal: int, Percentage: decimal }\n\n**Scope - INCLUDED**:\n- Water entry logging with ml amount\n- Cup-based logging using default cup size\n- Multiple cup logging\n- Undo last entry from current day\n- Input validation\n- Timestamp recording (UTC)\n- Persistence to SQLite\n- Daily total calculation\n- Confirmation messages\n\n**Scope - EXCLUDED**:\n- Configuration (Task 1)\n- Daemon/reminders (Task 2)\n- History viewing and export (Task 4)\n- Editing past entries\n- Bulk import\n\n**Success Criteria**:\n- User can log water by ml amount\n- User can log water by cup count\n- Each entry is timestamped and persisted\n- Daily total is calculated correctly\n- Undo removes only the last entry from today\n- Undo doesn't affect previous days\n- Invalid inputs are rejected with clear messages\n- Entries persist across app restarts\n- Unit tests verify entry validation\n- Unit tests verify daily total calculation\n- Unit tests verify undo logic (only today's entries, correct removal)\n\n**Constraints & Considerations**:\n- All timestamps in UTC (no timezone handling)\n- Daily boundary at midnight UTC\n- Undo only works for current day (after midnight UTC)\n- No edit capability (only add and undo)\n- No bulk operations\n- Database transaction for undo to ensure consistency\n- Performance: daily queries should be fast (indexed on timestamp)\n- No concurrent logging (single-user CLI)\n- Cup size must be positive integer from settings\n- Maximum ml per entry: reasonable limit (e.g., 10000ml) to prevent data entry errors",
+      "testStrategy": "",
+      "subtasks": [
+        {
+          "id": "DMA-21",
+          "parentId": "18ba88b0-aa1b-49f1-9b32-39b513ca35e9",
+          "title": "Build water entry service with ml and cup-based logging",
+          "description": "Create a WaterEntryService class that handles the core logic for recording water consumption. This service will support two entry methods: direct milliliter input and cup-based logging using the default cup size from settings. The service must validate all inputs (ml must be positive and within reasonable limits like 10000ml max, cup count must be positive integer), generate UTC timestamps for each entry, and persist entries to SQLite with proper transaction handling. The service should calculate daily totals by querying entries from the current UTC day (midnight to midnight boundary). This is the foundational service that other components (CLI commands, undo logic, history viewing) will depend on. The service must handle edge cases like entries at day boundaries and ensure database consistency through proper transaction management. It should also provide methods to retrieve today's entries and calculate cumulative daily totals, which are needed for confirmation messages and undo operations.",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:26:45.408069+00:00",
+          "updatedAt": "2026-01-19T13:26:45.408069+00:00",
+          "complexity": 4,
+          "databaseId": "917a517b-8f5a-46b7-9e4d-e65e01d93033",
+          "scopeBoundaries": {
+            "included": "Water entry logging with ml amount, cup-based logging using default cup size, input validation, timestamp recording in UTC, persistence to SQLite, daily total calculation",
+            "excluded": "Configuration management (handled by Sibling 2), daemon/reminders (handled by Sibling 3), history viewing and export (handled by Sibling 5), editing past entries, bulk import, undo logic (separate subtask)"
+          },
+          "implementationApproach": "1. Create WaterEntryService class with dependency injection for SQLite connection and settings service\\n2. Implement LogWaterByMl(int ml) method with validation (positive, max 10000ml) and UTC timestamp generation\\n3. Implement LogWaterByCups(int cupCount) method that retrieves cup size from settings and calls LogWaterByMl\\n4. Implement GetTodayEntries() method that queries entries from current UTC day boundary\\n5. Implement GetDailyTotal() method that sums ml from today's entries\\n6. Add database transaction wrapper for entry persistence to ensure consistency\\n7. Create unit tests for validation logic, timestamp generation, and daily total calculation",
+          "technicalConstraints": [
+            "All timestamps in UTC (no timezone handling)",
+            "Daily boundary at midnight UTC",
+            "Cup size must be positive integer from settings",
+            "Maximum ml per entry: 10000ml to prevent data entry errors",
+            "Single-user CLI (no concurrent logging)",
+            "Database queries should be indexed on timestamp for performance"
+          ],
+          "acceptanceCriteria": [
+            "Service accepts ml amount (positive integer, max 10000ml) and persists to SQLite with UTC timestamp",
+            "Service accepts cup count (positive integer) and converts to ml using default cup size from settings",
+            "Service calculates daily total by querying entries from current UTC day (midnight to midnight)",
+            "Service validates inputs and throws descriptive exceptions for invalid ml amounts or cup counts",
+            "Service returns all entries for current day with timestamps for undo and confirmation operations",
+            "Database transactions ensure consistency when persisting entries"
+          ],
+          "skills": [
+            "C#/.NET",
+            "SQLite",
+            "Service design",
+            "Input validation",
+            "Unit testing"
+          ],
+          "category": "development"
+        },
+        {
+          "id": "DMA-24",
+          "parentId": "18ba88b0-aa1b-49f1-9b32-39b513ca35e9",
+          "title": "Build undo mechanism to remove last water entry from current day",
+          "description": "Implement the undo functionality that allows users to remove their most recent water entry from the current day. This subtask focuses on creating an UndoLastEntry method in the WaterEntryService that safely removes only the last entry recorded today, with proper validation and transaction handling. The undo operation must verify that the entry being removed is from the current UTC day (not from a previous day), retrieve the entry ID of the most recent entry, delete it from the database within a transaction, and return the amount of water that was removed for confirmation messaging. The method should handle edge cases such as attempting to undo when no entries exist for today, and should throw descriptive exceptions for these scenarios. This is critical for the user experience - users need confidence that undo only affects today's entries and won't accidentally delete entries from yesterday. The implementation must integrate with the existing WaterEntryService and leverage the GetTodayEntries method to identify which entry to remove. After deletion, the service should recalculate and return the new daily total so the CLI can display an updated confirmation message like \\\"Removed 250ml. New total: 1500ml today.\\\" The undo operation must be atomic (all-or-nothing) to prevent partial deletions or data inconsistency if the app crashes mid-operation.",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:27:01.371828+00:00",
+          "updatedAt": "2026-01-19T13:27:01.371828+00:00",
+          "complexity": 4,
+          "databaseId": "9527ab4f-c3c2-45fc-9732-4a9ccc8dd99f",
+          "scopeBoundaries": {
+            "included": "Undo last entry from current day, validation that entry is from today, atomic database deletion, return removed amount and new daily total for confirmation messaging",
+            "excluded": "Configuration management (Task 1), daemon/reminders (Task 2), history viewing and export (Task 4), editing past entries, bulk operations, entries from previous days"
+          },
+          "implementationApproach": "1. Add UndoLastEntry() method to WaterEntryService that retrieves today's entries using GetTodayEntries()\\n2. Validate that at least one entry exists for today; throw exception if none found\\n3. Identify the last entry (most recent by timestamp) from the retrieved entries\\n4. Begin database transaction and delete the identified entry by ID\\n5. Recalculate daily total using GetDailyTotal() after deletion\\n6. Commit transaction and return object containing removed amount and new daily total\\n7. Add unit tests covering: successful undo with single entry, successful undo with multiple entries, undo with no entries, undo boundary conditions at day transitions",
+          "technicalConstraints": [
+            "All timestamps in UTC (no timezone handling)",
+            "Daily boundary at midnight UTC",
+            "Undo only works for current day entries",
+            "Database transaction required for atomicity",
+            "Single-user CLI (no concurrent logging)",
+            "Performance: daily queries should be fast (indexed on timestamp)"
+          ],
+          "acceptanceCriteria": [
+            "UndoLastEntry method removes only the most recent entry from the current UTC day",
+            "Undo operation throws descriptive exception when no entries exist for today",
+            "Undo operation throws descriptive exception when attempting to undo entries from previous days",
+            "Undo returns the amount of water removed and new daily total for confirmation messaging",
+            "Undo operation is atomic - uses database transaction to ensure consistency",
+            "Unit tests verify undo removes correct entry when multiple entries exist today",
+            "Unit tests verify undo does not affect entries from previous days",
+            "Unit tests verify undo returns accurate new daily total after removal"
+          ],
+          "skills": [
+            "C#/.NET",
+            "SQLite",
+            "Unit Testing",
+            "Transaction Management",
+            "UTC Date/Time Handling"
+          ],
+          "category": "development"
+        },
+        {
+          "id": "DMA-28",
+          "parentId": "18ba88b0-aa1b-49f1-9b32-39b513ca35e9",
+          "title": "Build CLI command to log water entries with flexible input parsing",
+          "description": "Create a CLI command handler that accepts water entry input from users in flexible formats and delegates to the WaterEntryService for persistence. This command must parse user input to determine whether the user is logging by milliliters (e.g., \"250ml\", \"250\") or by cup count (e.g., \"2 cups\", \"2c\"). The command should support multiple input formats for user convenience: direct ml amounts (integer), ml with unit suffix (\"250ml\"), cup counts with explicit unit (\"2 cups\", \"2c\"), or just a number that defaults to cups if no unit is specified (configurable behavior). After parsing the input, the command invokes the appropriate WaterEntryService method (LogWaterByMl or LogWaterByCups) and displays a confirmation message showing the amount logged and the new daily total. The command must handle parsing errors gracefully, providing clear error messages when input cannot be interpreted (e.g., \"Invalid input: please enter a number followed by 'ml' or 'cups'\"). This is the user-facing entry point that bridges the CLI interface with the service layer - it must be intuitive and forgiving of common input variations while maintaining data integrity through proper validation delegation to the service layer. The command should also integrate with the undo mechanism by displaying helpful messages like \"Logged 250ml. Daily total: 1500ml. (Use 'undo' to remove this entry)\" to guide users toward the undo feature if they make mistakes.",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:27:21.00624+00:00",
+          "updatedAt": "2026-01-19T13:27:21.00624+00:00",
+          "complexity": 4,
+          "databaseId": "158f96b3-b918-404c-9aa1-965e94a4b2b5",
+          "relevantFiles": [
+            {
+              "path": "src/Commands/LogWaterCommand.cs",
+              "action": "create",
+              "description": "CLI command handler that parses user input and invokes WaterEntryService to log water entries"
+            },
+            {
+              "path": "src/Commands/InputParser.cs",
+              "action": "create",
+              "description": "Utility class that parses flexible water entry input formats (ml, cups, etc.) and returns structured data"
+            },
+            {
+              "path": "src/Services/WaterEntryService.cs",
+              "action": "reference",
+              "description": "Existing service that handles water entry persistence and daily total calculation - will be called by LogWaterCommand"
+            }
+          ],
+          "codebasePatterns": [
+            "Dependency injection for service layer",
+            "Static utility methods for parsing logic",
+            "Exception handling with specific exception types",
+            "Unit test coverage for parsing and command logic"
+          ],
+          "existingInfrastructure": [
+            {
+              "name": "WaterEntryService",
+              "usage": "Inject into LogWaterCommand constructor; call LogWaterByMl(int ml) or LogWaterByCups(int cupCount) based on parsed input; call GetDailyTotal() to get confirmation message data",
+              "location": "src/Services/WaterEntryService.cs"
+            }
+          ],
+          "scopeBoundaries": {
+            "included": "CLI command that parses flexible water entry input (ml or cups), delegates to WaterEntryService, and displays confirmation messages with daily total and undo hint",
+            "excluded": "Configuration of default cup size (handled by Sibling 2), daemon/reminder functionality (Sibling 3), history viewing/export (Sibling 5), editing past entries, bulk operations"
+          },
+          "implementationApproach": "1. Create InputParser utility class with static method ParseWaterInput(string input) that returns (int amount, string unit) tuple\\n2. Implement parsing logic: check for 'ml' suffix (parse as ml), check for 'cups'/'c' suffix (parse as cups), default to cups if no unit specified\\n3. Validate parsed amount is positive integer; throw FormatException with clear message if parsing fails\\n4. Create LogWaterCommand class that accepts user input string as parameter\\n5. Call InputParser.ParseWaterInput() to get amount and unit\\n6. Call appropriate WaterEntryService method (LogWaterByMl or LogWaterByCups) based on parsed unit\\n7. Catch service exceptions and display user-friendly error messages\\n8. Display confirmation message: \\\"Logged {amount}ml. Daily total: {dailyTotal}ml. (Use 'undo' to remove this entry)\\\"\\n9. Add unit tests for InputParser covering all input formats and error cases\\n10. Add unit tests for LogWaterCommand covering successful logging and error scenarios",
+          "acceptanceCriteria": [
+            "Command accepts ml input in formats: '250', '250ml', '250 ml' and logs correct amount",
+            "Command accepts cup input in formats: '2 cups', '2c', '2 cup' and converts to ml using default cup size",
+            "Command displays confirmation message with logged amount and new daily total",
+            "Command displays helpful undo hint in confirmation message",
+            "Command throws clear error message for invalid input (non-numeric, negative, or unparseable)",
+            "Command delegates validation to WaterEntryService and propagates service exceptions with user-friendly messages",
+            "Unit tests verify parsing logic for all supported input formats",
+            "Unit tests verify error handling for invalid inputs"
+          ],
+          "skills": [
+            "C#/.NET",
+            "CLI design",
+            "Input parsing and validation",
+            "User experience"
+          ],
+          "category": "development"
+        },
+        {
+          "id": "DMA-32",
+          "parentId": "18ba88b0-aa1b-49f1-9b32-39b513ca35e9",
+          "title": "Add comprehensive test coverage for water entry validation and daily total calculations",
+          "description": "Create a comprehensive unit test suite for the WaterEntryService that validates all input validation logic, edge cases, and daily total calculation accuracy. This subtask focuses on testing the core business logic that ensures data integrity and correctness of water logging operations. The test suite must cover: (1) Input validation for ml amounts - testing positive values, zero, negative values, values exceeding the 10000ml maximum, and non-integer inputs; (2) Cup-based logging validation - testing positive cup counts, zero cups, negative cups, and non-integer cup counts; (3) Timestamp generation and UTC boundary handling - verifying that entries recorded near midnight UTC are correctly assigned to the appropriate day, testing entries at day boundaries (23:59:59 UTC and 00:00:00 UTC), and ensuring no timezone conversion errors occur; (4) Daily total calculation accuracy - testing single entry totals, multiple entries summing correctly, entries from different times within the same day, and ensuring entries from previous days are not included in today's total; (5) Edge cases like logging immediately after midnight, logging just before midnight, and rapid successive entries with identical timestamps. The tests must use mocking for the SQLite connection and settings service to isolate the WaterEntryService logic, ensuring tests run quickly and reliably without database dependencies. Test data should include realistic scenarios: typical cup sizes (250ml), common logging patterns (multiple entries throughout a day), and boundary conditions. This test suite is critical because it provides confidence that the service correctly handles all valid and invalid inputs, maintains data integrity across day boundaries, and calculates accurate daily totals that users see in confirmation messages and undo operations.",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:27:46.18374+00:00",
+          "updatedAt": "2026-01-19T13:27:46.18374+00:00",
+          "complexity": 6,
+          "databaseId": "15cf3f68-f3cd-40c1-8440-670300c8ad04",
+          "relevantFiles": [
+            {
+              "path": "src/Services/WaterEntryService.cs",
+              "action": "reference",
+              "description": "The service class being tested - contains LogWaterByMl, LogWaterByCups, GetTodayEntries, GetDailyTotal methods that need comprehensive test coverage"
+            },
+            {
+              "path": "tests/Services/WaterEntryServiceTests.cs",
+              "action": "create",
+              "description": "New unit test file containing all test cases for input validation, timestamp handling, daily total calculation, and edge cases"
+            }
+          ],
+          "codebasePatterns": [
+            "Use xUnit or NUnit testing framework",
+            "Use Moq for mocking dependencies",
+            "Follow AAA pattern (Arrange, Act, Assert)",
+            "Use descriptive test names: TestMethod_Scenario_ExpectedResult",
+            "Group related tests in test classes",
+            "Mock external dependencies (SQLite, settings service)"
+          ],
+          "scopeBoundaries": {
+            "included": "Comprehensive unit test coverage for WaterEntryService validation logic, timestamp generation, daily total calculation, and edge cases at day boundaries",
+            "excluded": "Integration tests with real database, performance testing, CLI command testing (covered in Subtask 3), undo mechanism testing (covered in Subtask 2), configuration/settings management (belongs to Task 1), daemon/reminder functionality (belongs to Task 2), history viewing/export (belongs to Task 5)"
+          },
+          "implementationApproach": "1. Create WaterEntryServiceTests class with setup method that mocks SQLite connection and settings service\\n2. Implement test group for ml validation: TestLogWaterByMl_ValidPositiveAmount_Succeeds, TestLogWaterByMl_ZeroAmount_ThrowsException, TestLogWaterByMl_NegativeAmount_ThrowsException, TestLogWaterByMl_ExceedsMaximum_ThrowsException\\n3. Implement test group for cup validation: TestLogWaterByCups_ValidPositiveCount_Succeeds, TestLogWaterByCups_ZeroCount_ThrowsException, TestLogWaterByCups_NegativeCount_ThrowsException\\n4. Implement test group for timestamp/boundary handling: TestTimestampGeneration_RecordsUTC, TestDayBoundary_Entry2359UTC_AssignedToCurrentDay, TestDayBoundary_Entry0000UTC_AssignedToNextDay, TestGetTodayEntries_ExcludesPreviousDayEntries\\n5. Implement test group for daily total calculation: TestGetDailyTotal_SingleEntry_ReturnsCorrectAmount, TestGetDailyTotal_MultipleEntries_SumsCorrectly, TestGetDailyTotal_ExcludesPreviousDayEntries, TestGetDailyTotal_EmptyDay_ReturnsZero\\n6. Implement test group for edge cases: TestRapidSuccessiveEntries_AllRecorded, TestMidnightBoundary_EntriesAssignedCorrectly\\n7. Verify all exception messages are descriptive and user-friendly",
+          "technicalConstraints": [
+            "All timestamps must be in UTC with no timezone conversion",
+            "Daily boundary is at midnight UTC (00:00:00)",
+            "Tests must use mocking to avoid database dependencies",
+            "Tests must run quickly and reliably in CI/CD pipeline",
+            "Cup size must be positive integer from settings service",
+            "Maximum ml per entry is 10000ml"
+          ],
+          "acceptanceCriteria": [
+            "Unit tests verify ml validation: positive values accepted, zero/negative/exceeding 10000ml rejected with descriptive exceptions",
+            "Unit tests verify cup validation: positive integers accepted, zero/negative/non-integer values rejected with descriptive exceptions",
+            "Unit tests verify UTC timestamp generation: entries recorded at day boundaries (23:59:59 UTC and 00:00:00 UTC) are correctly assigned to appropriate day",
+            "Unit tests verify daily total calculation: single entry returns correct total, multiple entries sum correctly, entries from previous days excluded from today's total",
+            "Unit tests verify edge cases: rapid successive entries handled correctly, entries at exact midnight boundary assigned to correct day, GetTodayEntries returns only current day's entries",
+            "All tests use mocking for SQLite connection and settings service to isolate business logic and ensure fast execution",
+            "Test coverage includes realistic scenarios: typical cup sizes (250ml), multiple entries throughout a day, boundary conditions at day transitions",
+            "Tests verify that validation exceptions contain clear, user-friendly error messages describing what went wrong and acceptable input ranges"
+          ],
+          "skills": [
+            "Unit Testing",
+            "C# Testing Frameworks",
+            "Mocking/Mocks",
+            "Test Data Design",
+            "Edge Case Analysis",
+            "UTC Timestamp Handling"
+          ],
+          "category": "testing"
+        }
+      ],
+      "createdAt": "2026-01-19T13:26:30.2686+00:00",
+      "updatedAt": "2026-01-19T13:27:46.475+00:00",
+      "blocks": [
+        "DMA-19"
+      ]
+    },
+    {
+      "id": "DMA-19",
+      "title": "Water history can be viewed and exported for analysis and record-keeping",
+      "description": "Users can view their daily water intake history and export it as CSV for analysis, tracking trends over time.",
+      "status": "pending",
+      "priority": "medium",
+      "dependencies": [
+        "DMA-18"
+      ],
+      "details": "**User Capability**: Users can view their water intake history over a configurable number of days and export their complete history (daily summaries and detailed events) as CSV files.\n\n**Business Value**: History provides motivation and insight. Users want to see trends, celebrate progress, and keep records. Export enables external analysis and data portability. Without history, the app only shows today's progress.\n\n**Functional Requirements**:\n- Display history command showing last N days (default 7)\n- Show for each day: date, total ml, daily goal, percentage of goal\n- Sort history by date (newest first or oldest first, configurable)\n- Export to CSV with two formats:\n  - Daily summary: date, total_ml, goal_ml, percentage\n  - Detailed events: timestamp, ml, daily_total_at_time\n- CSV files include headers\n- Export location configurable (default: app directory)\n- Handle days with no entries (show 0ml)\n- Handle incomplete days (show current total, not final)\n\n**Data Model & Structure**:\n- No new tables needed (uses water_events and settings)\n- Daily summary can be calculated via query:\n  - SELECT DATE(timestamp_utc) as date, SUM(ml) as total_ml FROM water_events GROUP BY DATE(timestamp_utc)\n- Detailed events query:\n  - SELECT timestamp_utc, ml FROM water_events ORDER BY timestamp_utc\n\n**Technical Approach**:\n- Domain layer: HistoryEntry value object (date, total_ml, goal_ml)\n- Application layer: HistoryService with GetHistory(days) and GetDetailedEvents()\n- Application layer: CsvExporter with ExportDailySummary() and ExportDetailedEvents()\n- Infrastructure layer: SQLiteHistoryRepository for querying history\n- Infrastructure layer: FileSystemCsvWriter for writing CSV files\n- CLI layer: HistoryCommand and ExportCommand\n- Use CsvHelper library for CSV generation (or manual StringBuilder for simplicity)\n- Use System.IO for file operations\n\n**User Workflows**:\n1. User runs `hidratacao history` → queries last 7 days, displays table with date, total, goal, percentage\n2. User runs `hidratacao history --days 30` → queries last 30 days, displays table\n3. User runs `hidratacao export` → creates two CSV files in app directory:\n   - `water_history_daily_YYYYMMDD.csv` with daily summaries\n   - `water_history_events_YYYYMMDD.csv` with detailed events\n   - Displays \"Exported to [path]\"\n4. User runs `hidratacao export --output ./my_data/` → creates CSV files in specified directory\n5. User opens CSV in Excel/spreadsheet → sees formatted data with headers\n\nEdge cases:\n- No data exists → history shows \"No data available\"\n- Partial day (current day) → shows current total, not final\n- Days with no entries → show 0ml, 0%\n- Export with no data → create empty CSV with headers only\n- Export path doesn't exist → create directory or error with clear message\n- Export file already exists → overwrite or prompt (configurable)\n- History spanning multiple months → handle date boundaries correctly\n- Timezone considerations: all dates in UTC\n\n**API/Interface Specifications**:\n- CLI Commands:\n  - `hidratacao history [--days N]` → displays history table\n  - `hidratacao export [--output PATH]` → exports to CSV files\n- Application Service: `IHistoryService.GetHistory(days) -> List<HistoryEntry>`, `IHistoryService.GetDetailedEvents() -> List<DetailedEvent>`\n- Repository: `IHistoryRepository.GetDailySummary(startDate, endDate) -> List<DailySummary>`, `IHistoryRepository.GetAllEvents() -> List<WaterEvent>`\n- Exporter: `ICsvExporter.ExportDailySummary(List<DailySummary>, outputPath) -> void`, `ICsvExporter.ExportDetailedEvents(List<WaterEvent>, outputPath) -> void`\n- Data objects:\n  - HistoryEntry: { Date: DateTime, TotalMl: int, GoalMl: int, Percentage: decimal }\n  - DetailedEvent: { Timestamp: DateTime, Ml: int, DailyTotalAtTime: int }\n\n**Scope - INCLUDED**:\n- History viewing (last N days)\n- Daily summary display\n- CSV export (daily summaries)\n- CSV export (detailed events)\n- Configurable export location\n- Proper CSV formatting with headers\n- Handling of days with no data\n\n**Scope - EXCLUDED**:\n- Configuration (Task 1)\n- Daemon/reminders (Task 2)\n- Water logging (Task 3)\n- Data visualization/charts\n- Cloud sync or backup\n- Filtering by date range (only last N days)\n- Editing historical data\n\n**Success Criteria**:\n- History command displays correct daily totals\n- History shows correct number of days\n- Export creates valid CSV files\n- CSV files have proper headers\n- Exported data matches database records\n- Days with no entries show 0ml\n- Current day shows current total (not final)\n- Export location is configurable\n- Unit tests verify daily total calculation\n- Unit tests verify CSV formatting\n- Unit tests verify date range queries\n\n**Constraints & Considerations**:\n- All dates in UTC (no timezone conversion)\n- Daily boundary at midnight UTC\n- Current day is incomplete (shows current total, not final)\n- CSV format: standard RFC 4180 (comma-separated, quoted fields)\n- Large datasets: optimize queries with proper indexing\n- File I/O: handle permission errors gracefully\n- Export filename includes timestamp to avoid overwrites\n- No pagination (all history in one view/export)\n- Performance: history queries should be fast (indexed on timestamp)\n- Memory: load all history into memory (acceptable for single user, local data)",
+      "testStrategy": "",
+      "subtasks": [
+        {
+          "id": "DMA-20",
+          "parentId": "51601a61-eb88-492f-b1ec-cb6b01c4c2bd",
+          "title": "Build water history query logic to retrieve daily totals from SQLite",
+          "description": "Implement the core data retrieval logic for water history viewing. This subtask focuses on creating a method that queries the SQLite database to fetch water intake records for a configurable number of past days, aggregates them into daily totals, and returns structured data ready for display or export.\n\nThe implementation must:\n1. Query the water_logs table for entries within the specified date range (last N days, where N is configurable)\n2. Group entries by UTC date (midnight-to-midnight boundaries)\n3. Sum the ml amounts for each day to calculate daily totals\n4. Handle days with no entries by including them with 0ml values\n5. Ensure the current day is included but marked as incomplete (showing current total, not final)\n6. Return results in chronological order (oldest to newest)\n7. Optimize queries with proper indexing on timestamp columns for performance with large datasets\n\nThis is a foundational subtask that other history/export features depend on. The query logic must be efficient and accurate since it's called by both the history display command and CSV export functionality. The method should accept parameters for the number of days to retrieve and return a structured collection (List<DailyWaterTotal> or similar) containing date, total_ml, and is_current_day flag.\n\nKey technical decisions:\n- Use UTC timestamps exclusively (no timezone conversion)\n- Daily boundary at midnight UTC\n- Include all days in range, even those with zero entries\n- Current day flag allows display logic to show it as incomplete\n- Query should use indexed timestamp columns for performance\n- Handle edge cases: first day of data, current day, days with no entries",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:26:44.672811+00:00",
+          "updatedAt": "2026-01-19T13:26:44.672811+00:00",
+          "complexity": 4,
+          "databaseId": "49b0f406-66f8-45a0-9fbe-fa1db8f6dcb3",
+          "codebasePatterns": [
+            "Repository pattern for data access",
+            "Unit tests for daily total calculation",
+            "Unit tests for date range queries",
+            ".NET 10 features"
+          ],
+          "scopeBoundaries": {
+            "included": "Water history query logic that retrieves daily totals from SQLite for a configurable number of past days, with proper UTC date handling and aggregation",
+            "excluded": "Configuration storage (Task 2), daemon/reminders (Task 3), water logging (Task 4), display formatting, CSV export, data visualization, cloud sync"
+          },
+          "implementationApproach": "1. Create a DailyWaterTotal data class/record with properties: Date, TotalMl, IsCurrentDay\\n2. Add a GetWaterHistory(int daysBack) method to the data access layer that queries the water_logs table\\n3. Use SQL GROUP BY with DATE() function to aggregate entries by UTC date\\n4. Generate a complete date range for the past N days and LEFT JOIN with actual entries to include zero-entry days\\n5. Calculate daily totals using SUM(ml_amount) and identify current day with a flag\\n6. Ensure timestamp column has an index for query performance\\n7. Return results ordered by date ascending",
+          "technicalConstraints": [
+            "All dates in UTC (no timezone conversion)",
+            "Daily boundary at midnight UTC",
+            "Current day is incomplete (shows current total, not final)",
+            "Large datasets: optimize queries with proper indexing on timestamp",
+            "Performance: history queries should be fast (indexed on timestamp)",
+            "Memory: load all history into memory (acceptable for single user, local data)"
+          ],
+          "acceptanceCriteria": [
+            "Query returns daily totals for the specified number of past days with correct ml amounts",
+            "Days with no water entries are included with 0ml value",
+            "Current day is included and marked as incomplete (shows current total, not final)",
+            "Results are returned in chronological order (oldest to newest)",
+            "Query uses indexed timestamp columns and executes efficiently on large datasets",
+            "All dates are in UTC with midnight boundaries (no timezone conversion)",
+            "Method accepts configurable parameter for number of days to retrieve"
+          ],
+          "category": "development"
+        },
+        {
+          "id": "DMA-25",
+          "parentId": "51601a61-eb88-492f-b1ec-cb6b01c4c2bd",
+          "title": "Build CSV export formatter for daily water summaries with RFC 4180 compliance",
+          "description": "Implement the CSV export formatting logic that transforms daily water history data into properly formatted CSV output compliant with RFC 4180 standard. This subtask focuses on creating a dedicated formatter/converter that takes the structured daily water totals (from Subtask 1's query logic) and converts them into valid CSV format with appropriate headers, quoted fields, and escaped values.\\n\\nThe implementation must:\\n1. Accept a collection of DailyWaterTotal objects (output from Subtask 1's GetWaterHistory method)\\n2. Generate CSV headers: Date, Daily Total (ml), Status (to indicate if day is complete or current/incomplete)\\n3. Format each daily total row with proper CSV escaping (RFC 4180 compliance)\\n4. Handle edge cases: dates with no entries (0ml values), current day marked as incomplete, special characters in data\\n5. Return the complete CSV content as a string ready for file writing\\n6. Ensure consistent date formatting (ISO 8601 format: YYYY-MM-DD) across all rows\\n7. Include optional metadata rows (export timestamp, total days exported) as comments at the top\\n\\nThis formatter is a critical bridge between the data retrieval layer (Subtask 1) and the file export functionality (which will be a separate subtask). By isolating CSV formatting logic, we ensure:\\n- Testability: CSV format can be validated independently of file I/O\\n- Reusability: Same formatter can be used for both file export and console display\\n- Maintainability: CSV format changes only require updates in one place\\n- Compliance: RFC 4180 standard ensures compatibility with Excel, Google Sheets, and other tools\\n\\nKey technical decisions:\\n- Use StringBuilder for efficient string concatenation (performance with large datasets)\\n- Implement proper CSV field quoting: quote fields containing commas, quotes, or newlines\\n- Escape quotes within fields by doubling them (RFC 4180 standard)\\n- Use consistent date format (ISO 8601) for all dates\\n- Include status column to distinguish between complete days and current incomplete day\\n- Add metadata comments at top (export timestamp, number of days) for record-keeping\\n- Handle null/empty values gracefully (treat as 0ml or empty string as appropriate)",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:27:05.304378+00:00",
+          "updatedAt": "2026-01-19T13:27:05.304378+00:00",
+          "complexity": 4,
+          "databaseId": "b68c8d6c-06f4-469c-bd42-f00c5864416c",
+          "codebasePatterns": [
+            "Use StringBuilder for efficient string building",
+            "Follow .NET naming conventions (PascalCase for class/method names)",
+            "Implement proper CSV escaping per RFC 4180 standard",
+            "Use ISO 8601 date format consistently (YYYY-MM-DD)",
+            "Include unit tests for formatting logic"
+          ],
+          "scopeBoundaries": {
+            "included": "CSV export formatter that converts daily water history data into RFC 4180 compliant CSV format with proper headers, date formatting, and status indicators",
+            "excluded": "File I/O operations (writing to disk), configurable export location, detailed event export (only daily summaries), configuration management, water logging, daemon/reminders"
+          },
+          "implementationApproach": "1. Create a CsvExportFormatter class (or static method) with a FormatDailyWaterHistory(List<DailyWaterTotal> history) method\\n2. Use StringBuilder to build CSV content efficiently\\n3. Add metadata header rows as comments (lines starting with #): export timestamp and total days\\n4. Write CSV headers: \\\"Date\\\",\\\"Daily Total (ml)\\\",\\\"Status\\\"\\n5. Iterate through each DailyWaterTotal and write a row: date (ISO 8601), total_ml, status (\\\"Complete\\\" or \\\"Incomplete\\\")\\n6. Implement RFC 4180 CSV escaping: quote fields containing commas/quotes/newlines, double any quotes within fields\\n7. Return the complete formatted string\\n8. Add unit tests: verify headers, verify date formatting, verify status flags, verify RFC 4180 compliance with special characters",
+          "technicalConstraints": [
+            "RFC 4180 CSV standard compliance (comma-separated, quoted fields, escaped quotes)",
+            "All dates must be in UTC with ISO 8601 format (YYYY-MM-DD)",
+            "Current day must be marked as incomplete, previous days as complete",
+            "Must handle large datasets efficiently (use StringBuilder, not string concatenation)",
+            "No timezone conversion - all dates already in UTC from Subtask 1",
+            "Memory efficient: format as string (acceptable for single user, local data)"
+          ],
+          "acceptanceCriteria": [
+            "CSV output contains correct headers: Date, Daily Total (ml), Status",
+            "All dates are formatted in ISO 8601 format (YYYY-MM-DD)",
+            "Daily totals match the values from the DailyWaterTotal objects",
+            "Current day is marked with 'Incomplete' status, previous days marked as 'Complete'",
+            "Days with zero entries show 0ml in the Daily Total column",
+            "CSV output is RFC 4180 compliant (proper quoting and escaping)",
+            "Metadata comments at top include export timestamp and number of days exported",
+            "Special characters and edge cases are handled without breaking CSV format",
+            "Formatter returns complete CSV content as a single string",
+            "Unit tests verify CSV format for various scenarios (empty history, single day, multiple days, current day)"
+          ],
+          "skills": [
+            "C#/.NET",
+            "CSV formatting",
+            "RFC 4180 standard",
+            "String manipulation",
+            "Unit testing"
+          ],
+          "category": "development"
+        },
+        {
+          "id": "DMA-29",
+          "parentId": "51601a61-eb88-492f-b1ec-cb6b01c4c2bd",
+          "title": "Wire up CSV export file writing with configurable output location",
+          "description": "Implement the file I/O layer that takes the formatted CSV content (from Subtask 2's formatter) and writes it to disk at a configurable location. This subtask focuses on creating a dedicated export service that handles file writing, filename generation with timestamps, directory validation, and error handling for permission issues.\\n\\nThe implementation must:\\n1. Accept the formatted CSV string from the CsvExportFormatter and a destination directory path\\n2. Generate a timestamped filename (e.g., water_history_2024-01-15_143022.csv) to prevent overwrites\\n3. Validate that the destination directory exists and is writable before attempting to write\\n4. Create the directory if it doesn't exist (with appropriate error handling if creation fails)\\n5. Write the CSV content to the file with UTF-8 encoding\\n6. Handle file I/O errors gracefully: permission denied, disk full, invalid path, etc.\\n7. Return success/failure status with meaningful error messages for user feedback\\n8. Support configurable export location via a settings parameter or environment variable\\n\\nThis service bridges the gap between data formatting (Subtask 2) and user-facing export functionality. By isolating file I/O concerns, we ensure:\\n- Separation of concerns: formatting logic stays separate from file operations\\n- Testability: file writing can be mocked in unit tests\\n- Error resilience: permission and disk errors are caught and reported clearly\\n- Flexibility: export location can be changed without modifying formatter or query logic\\n- User experience: timestamped filenames prevent accidental overwrites\\n\\nKey technical decisions:\\n- Use System.IO.File.WriteAllText for simple, reliable file writing\\n- Generate timestamp in format YYYY-MM-DD_HHmmss for human-readable, sortable filenames\\n- Validate directory existence and writability before writing (fail fast)\\n- Create directory with Directory.CreateDirectory if needed (recursive creation)\\n- Use UTF-8 encoding explicitly for CSV compatibility\\n- Catch specific exceptions: UnauthorizedAccessException, DirectoryNotFoundException, IOException\\n- Return a result object (success boolean + error message) for clear error reporting\\n- Support default export location (e.g., user's Documents folder or app directory) if not configured\\n- Log file path on successful export for user reference",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:27:26.021587+00:00",
+          "updatedAt": "2026-01-19T13:27:26.021587+00:00",
+          "complexity": 4,
+          "databaseId": "2deea477-aa38-431a-9d02-919635b39586",
+          "scopeBoundaries": {
+            "included": "File I/O layer that writes formatted CSV content to disk with configurable output location, timestamped filenames, directory validation, and error handling for permission/disk issues",
+            "excluded": "CSV formatting (Subtask 2), water history querying (Subtask 1), configuration storage (Sibling 2), CLI command implementation (belongs to export command subtask)"
+          },
+          "implementationApproach": "1. Create an ExportResult class/record with properties: IsSuccess (bool), FilePath (string), ErrorMessage (string)\\n2. Create a CsvExportService class with a method ExportWaterHistory(string csvContent, string? exportDirectory) that returns ExportResult\\n3. Determine the export directory: use provided parameter, fall back to configured location, or use default (e.g., Environment.GetFolderPath(SpecialFolder.MyDocuments))\\n4. Validate directory exists and is writable; if not, attempt to create it with Directory.CreateDirectory\\n5. Generate timestamped filename: string.Format(\\\"water_history_{0:yyyy-MM-dd_HHmmss}.csv\\\", DateTime.UtcNow)\\n6. Construct full file path by combining directory and filename\\n7. Wrap file write in try-catch: File.WriteAllText(filePath, csvContent, Encoding.UTF8)\\n8. Catch UnauthorizedAccessException, DirectoryNotFoundException, IOException separately with specific error messages\\n9. Return ExportResult with IsSuccess=true and FilePath on success, or IsSuccess=false and ErrorMessage on failure\\n10. Add unit tests: verify file is created, verify UTF-8 encoding, verify timestamp format, verify error handling for permission denied, verify directory creation",
+          "technicalConstraints": [
+            "UTF-8 encoding required for CSV compatibility",
+            "All timestamps must be UTC",
+            "Directory creation must be recursive",
+            "Permission errors must be caught and reported gracefully",
+            "Export location must be configurable (not hardcoded)",
+            ".NET 10 compatibility"
+          ],
+          "acceptanceCriteria": [
+            "CSV file is written to the configured export location with a timestamped filename (format: water_history_YYYY-MM-DD_HHmmss.csv)",
+            "Export directory is created automatically if it doesn't exist",
+            "File is written with UTF-8 encoding and contains the exact CSV content from the formatter",
+            "Permission errors (UnauthorizedAccessException) are caught and reported with a clear error message",
+            "Invalid or non-existent directory paths are validated before writing, with appropriate error handling",
+            "Successful export returns a result object indicating success and the full file path written",
+            "Failed export returns a result object with failure status and descriptive error message",
+            "Timestamped filenames prevent accidental overwrites of previous exports",
+            "Export location can be configured via settings or defaults to a sensible location (e.g., user Documents folder)"
+          ],
+          "skills": [
+            "C#/.NET",
+            "File I/O operations",
+            "Error handling",
+            "Configuration management"
+          ],
+          "category": "development"
+        },
+        {
+          "id": "DMA-34",
+          "parentId": "51601a61-eb88-492f-b1ec-cb6b01c4c2bd",
+          "title": "Build history display command to render daily water totals with formatting",
+          "description": "Implement the CLI command interface that displays water history to users in a readable, formatted table. This subtask focuses on creating a dedicated history command handler that takes the daily water totals from Subtask 1's query logic and presents them in a well-formatted console output with proper alignment, headers, and visual indicators.\\n\\nThe implementation must:\\n1. Create a history command handler that accepts an optional parameter for number of days to display (default to last 7 days)\\n2. Call the GetWaterHistory method from Subtask 1 to retrieve daily totals for the specified date range\\n3. Format the output as a readable table with columns: Date, Daily Total (ml), Status, Progress Indicator\\n4. Display dates in a user-friendly format (e.g., \\\"Mon, Jan 15, 2024\\\") while maintaining UTC consistency\\n5. Show the daily total in ml with consistent decimal places (no decimals needed for ml)\\n6. Mark the current day with an \\\"Incomplete\\\" status and previous days with \\\"Complete\\\"\\n7. Include a visual progress bar or percentage indicator showing progress toward the daily goal (requires integration with settings from Sibling 2)\\n8. Handle edge cases: no history data, single day, current day with zero entries\\n9. Display summary statistics at the bottom: total ml for period, average daily intake, days with entries\\n10. Provide clear error messages if history retrieval fails\\n\\nThis command is the primary user-facing interface for viewing water history. By isolating display logic from data retrieval and export logic, we ensure:\\n- Separation of concerns: display formatting stays separate from queries and file I/O\\n- Consistency: same daily totals data is used for both display and export\\n- Maintainability: display format changes only require updates in one place\\n- User experience: clear, readable output with helpful summary statistics\\n- Flexibility: can easily add sorting, filtering, or different display formats later\\n\\nKey technical decisions:\\n- Use Console.WriteLine with formatted strings for table output (simple, no external dependencies)\\n- Implement a simple table formatter with fixed-width columns for alignment\\n- Display dates in user-friendly format (day of week, month, day, year) for readability\\n- Show progress toward daily goal as a percentage and optional visual bar (e.g., \\\"████░░░░░░ 45%\\\")\\n- Current day marked as \\\"Incomplete\\\" to indicate it's still in progress\\n- Summary statistics at bottom provide quick insights (total, average, days with entries)\\n- Handle missing daily goal gracefully (show totals without progress if goal not configured)\\n- Use consistent spacing and alignment for professional appearance\\n- Support configurable number of days via command parameter (default 7, allow up to 365)\\n- Include helpful header explaining what the data represents",
+          "status": "pending",
+          "priority": "high",
+          "dependencies": [],
+          "details": "",
+          "testStrategy": "",
+          "createdAt": "2026-01-19T13:27:52.33919+00:00",
+          "updatedAt": "2026-01-19T13:27:52.33919+00:00",
+          "complexity": 4,
+          "databaseId": "65f3b94a-5f81-4100-add2-608bd534ee50",
+          "relevantFiles": [
+            {
+              "path": "src/Commands/HistoryCommand.cs",
+              "action": "create",
+              "description": "CLI command handler for displaying water history with formatted table output"
+            },
+            {
+              "path": "src/Formatters/HistoryTableFormatter.cs",
+              "action": "create",
+              "description": "Utility class for formatting daily water totals into readable table output with alignment and visual indicators"
+            },
+            {
+              "path": "src/Data/WaterHistoryRepository.cs",
+              "action": "reference",
+              "description": "Data access layer containing GetWaterHistory method from Subtask 1 that retrieves daily totals"
+            }
+          ],
+          "codebasePatterns": [
+            "Dependency injection for service access",
+            "Command handler pattern for CLI commands",
+            "Formatter/utility classes for output formatting",
+            "Try-catch error handling for data operations",
+            "Unit tests for formatting and calculation logic"
+          ],
+          "existingInfrastructure": [
+            {
+              "name": "WaterHistoryRepository",
+              "usage": "Inject into HistoryCommand, call GetWaterHistory(daysBack) to retrieve List<DailyWaterTotal>",
+              "location": "src/Data/WaterHistoryRepository.cs"
+            },
+            {
+              "name": "DailyWaterTotal",
+              "usage": "Data class returned from GetWaterHistory containing Date, TotalMl, IsCurrentDay properties",
+              "location": "src/Models/DailyWaterTotal.cs"
+            }
+          ],
+          "scopeBoundaries": {
+            "included": "CLI command interface for displaying water history in formatted table with daily totals, status indicators, progress toward goal, and summary statistics",
+            "excluded": "Configuration management (belongs to Sibling 2), daemon/reminders (belongs to Sibling 3), water logging (belongs to Sibling 4), data visualization/charts, cloud sync, filtering by custom date ranges, editing historical data"
+          },
+          "implementationApproach": "1. Create HistoryCommand class that implements the command handler interface, accepting optional daysBack parameter (default 7)\\n2. In the command's Execute method, call WaterHistoryRepository.GetWaterHistory(daysBack) to retrieve DailyWaterTotal collection\\n3. Create HistoryTableFormatter class with a Format(List<DailyWaterTotal> history, int? dailyGoal) method that returns formatted string\\n4. In the formatter, build table output with headers: Date | Daily Total (ml) | Status | Progress\\n5. For each DailyWaterTotal, format the date using DateTime.ToString(\\\"ddd, MMM dd, yyyy\\\"), display total_ml, set status based on IsCurrentDay flag\\n6. Calculate progress percentage: (total_ml / dailyGoal) * 100, clamp to 100%, display as percentage or visual bar\\n7. After all rows, add summary line with total ml, average daily intake, and count of days with entries\\n8. Handle edge cases: if no history, display \\\"No water history available\\\"; if dailyGoal is null, show totals without progress\\n9. Return formatted string from formatter, display via Console.WriteLine in command\\n10. Add unit tests: verify table headers, verify date formatting, verify status flags, verify progress calculation, verify summary statistics\"",
+          "technicalConstraints": [
+            "All dates must be in UTC with no timezone conversion",
+            "Daily boundary at midnight UTC",
+            "Current day marked as incomplete (shows current total, not final)",
+            "No external dependencies for table formatting (use Console.WriteLine)",
+            "Performance: queries should be fast with proper indexing",
+            "Memory: load all history into memory (acceptable for single user)",
+            "Support configurable number of days (default 7, range 1-365)"
+          ],
+          "acceptanceCriteria": [
+            "History command displays a formatted table with columns: Date, Daily Total (ml), Status, Progress Indicator",
+            "Dates are displayed in user-friendly format (e.g., 'Mon, Jan 15, 2024') while maintaining UTC consistency",
+            "Current day is marked with 'Incomplete' status; previous days marked with 'Complete'",
+            "Progress indicator shows percentage toward daily goal (e.g., '45%' or visual bar) based on configured daily goal",
+            "Summary statistics displayed at bottom: total ml for period, average daily intake, number of days with entries",
+            "Command accepts optional parameter for number of days to display (default 7, range 1-365)",
+            "Edge cases handled: no history data shows appropriate message, single day displays correctly, current day with zero entries shows 0ml",
+            "Error messages are clear and helpful if history retrieval fails",
+            "Table output is properly aligned with consistent spacing and column widths",
+            "Daily totals match values from GetWaterHistory query (Subtask 1)"
+          ],
+          "skills": [
+            "C#/.NET",
+            "CLI design",
+            "String formatting",
+            "Console I/O",
+            "Data presentation"
+          ],
+          "category": "development"
+        }
+      ],
+      "createdAt": "2026-01-19T13:26:30.455013+00:00",
+      "updatedAt": "2026-01-19T13:27:52.608+00:00",
+      "blocks": []
+    }
+  ],
+  "metadata": {
+    "total": 4,
+    "filtered": 4,
+    "tag": "Hydration CLI Water Reminder And Log",
+    "storageType": "api",
+    "allTags": false
+  }
+}

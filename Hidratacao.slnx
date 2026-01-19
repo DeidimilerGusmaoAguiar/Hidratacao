@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Hidratacao.Application/Hidratacao.Application.csproj" />
+  <Project Path="Hidratacao.Cli/Hidratacao.Cli.csproj" />
+  <Project Path="Hidratacao.Domain/Hidratacao.Domain.csproj" />
+  <Project Path="Hidratacao.Infrastructure/Hidratacao.Infrastructure.csproj" />
+</Solution>

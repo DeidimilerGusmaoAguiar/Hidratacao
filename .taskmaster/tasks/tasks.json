@@ -1,0 +1,272 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Configurações de ingestão de água (meta, horários e copo padrão)",
+        "description": "Permite ao usuário configurar meta diária, horário ativo, intervalo de lembretes e tamanho padrão do copo, com persistência local.",
+        "status": "in-progress",
+        "priority": "high",
+        "dependencies": [],
+        "details": "Implementar um módulo de configurações para o app CLI. As configurações devem incluir: meta diária (ml), horário ativo (HH:MM-HH:MM), intervalo de lembretes (min) e tamanho padrão do copo (ml). Persistir em JSON (arquivo settings.json com objeto único), carregar no startup e permitir atualização via comandos CLI. Fornecer valores padrão na primeira execução (ex.: 2000ml, 08:00-22:00, 30 min, 250ml). Validar entradas (valores positivos, formato de hora válido, fim > início). Arquitetura em camadas: Domain (entidades/validações), Application (serviço de config), Infrastructure (repositório JSON), CLI (comandos).",
+        "testStrategy": "Testes unitários para validações (valores negativos, formato de hora, fim < início) e persistência (salvar e reabrir mantendo valores). Testar comandos CLI para cada parâmetro e comando de exibição das configs.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Definir esquema JSON para armazenamento das configurações",
+            "description": "Criar arquivo settings.json (objeto único) com campos: daily_goal_ml, active_hours_start, active_hours_end, reminder_interval_minutes, default_cup_ml e timestamps.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Criar inicialização que cria o arquivo se não existir e grava valores padrão. Garantir objeto único de configurações no settings.json. Implementar repositório JSON com Get/Save.",
+            "testStrategy": "Testar criação do arquivo, inserção de defaults e leitura/gravação da linha única. Simular falhas de arquivo/permissão quando possível."
+          },
+          {
+            "id": 2,
+            "title": "Implementar validação das configurações de ingestão",
+            "description": "Validar meta diária, horários ativos, intervalo e copo padrão antes de persistir.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Criar um validador com regras: valores numéricos > 0; horários no formato HH:MM (24h); horário final deve ser maior que o inicial. Retornar mensagens claras de erro para uso no CLI.",
+            "testStrategy": "Cobrir casos válidos e inválidos (ex.: 00:00, 23:59, fim < início, strings inválidas, zero/negativo)."
+          },
+          {
+            "id": 3,
+            "title": "Criar comandos CLI para visualizar e atualizar configurações",
+            "description": "Adicionar comandos: config --show, --goal, --active-hours, --interval, --cup-size.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Implementar parsing de argumentos no CLI, chamar validador e repositório. Mostrar confirmação ao usuário e erros amigáveis. Integrar com DI/serviços existentes.",
+            "testStrategy": "Testar cada comando com entradas válidas e inválidas, verificando mensagens e persistência."
+          },
+          {
+            "id": 4,
+            "title": "Modelar entidade Settings e validações de domínio",
+            "description": "Criar o modelo de configurações com regras de validação.",
+            "dependencies": [],
+            "details": "Definir entidade/DTO com daily_goal_ml, active_hours_start/end, reminder_interval_minutes e default_cup_ml. Implementar validações de valores positivos, formato HH:MM e regra fim > início, retornando mensagens claras.",
+            "status": "pending",
+            "testStrategy": "Criar testes unitários para regras de validação."
+          },
+          {
+            "id": 5,
+            "title": "Implementar repositório JSON para settings.json",
+            "description": "Persistir e carregar configurações locais em JSON.",
+            "dependencies": [
+              4
+            ],
+            "details": "Criar repositório que lê/grava `settings.json` como objeto único, cria arquivo com valores padrão na primeira execução e registra timestamps de criação/atualização.",
+            "status": "pending",
+            "testStrategy": "Testar criação do arquivo e roundtrip de leitura/gravação."
+          },
+          {
+            "id": 6,
+            "title": "Criar serviço de aplicação para configurações",
+            "description": "Orquestrar leitura, atualização e validação das configurações.",
+            "dependencies": [
+              4,
+              5
+            ],
+            "details": "Implementar serviço com métodos Get/Update, aplicando validações antes de persistir, mesclando atualizações parciais e retornando resultado/erros para a camada CLI.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 7,
+            "title": "Adicionar comandos CLI para exibir e atualizar configs",
+            "description": "Expor comandos `config` no CLI com parâmetros de atualização.",
+            "dependencies": [
+              6
+            ],
+            "details": "Implementar `config --show`, `--goal`, `--active-hours`, `--interval`, `--cup-size`, com parsing de argumentos, mensagens de sucesso e erros amigáveis integrados ao serviço.",
+            "status": "pending",
+            "testStrategy": "Testar parsing básico e respostas de erro/sucesso no CLI."
+          },
+          {
+            "id": 8,
+            "title": "Cobrir testes de persistência e integração de comandos",
+            "description": "Garantir comportamento esperado das configurações end-to-end.",
+            "dependencies": [
+              4,
+              5,
+              6,
+              7
+            ],
+            "details": "Criar testes para valores inválidos (negativos, horário malformado, fim <= início) e para salvar/abrir mantendo valores; adicionar testes de comandos se houver harness existente.",
+            "status": "pending",
+            "testStrategy": "Executar suíte de testes unitários e de integração do CLI (se disponível)."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Lembretes programados dentro do horário ativo",
+        "description": "Executa um modo daemon que dispara lembretes em intervalos configuráveis apenas no horário ativo.",
+        "status": "pending",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "details": "Implementar um processo daemon que roda em background no console e agenda lembretes conforme intervalo configurado, respeitando o horário ativo. O lembrete deve exibir hora atual, quanto falta para a meta e sugestão de ingestão (ex.: 250ml), além de beep no console. Garantir que apenas uma instância do daemon rode. Recalcular próximo lembrete ao mudar configurações.",
+        "testStrategy": "Testar agendamento com diferentes intervalos, garantir que lembretes só ocorram no horário ativo, e validar comportamento ao iniciar/parar o daemon.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Gerenciar processo daemon (start/stop e instância única)",
+            "description": "Criar controle de ciclo de vida do daemon e impedir múltiplas instâncias simultâneas.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Implementar lock de instância única (arquivo/Mutex). Criar comandos start/stop para o modo daemon e tratamento de encerramento gracioso.",
+            "testStrategy": "Validar que segunda execução é bloqueada. Testar start/stop e encerramento seguro."
+          },
+          {
+            "id": 2,
+            "title": "Motor de agendamento por intervalo",
+            "description": "Agendar lembretes com base no intervalo configurado e no próximo horário válido.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Implementar cálculo do próximo lembrete (considerando horário ativo), usando Timer/Task.Delay e recalculando após cada disparo.",
+            "testStrategy": "Testar intervalos curtos e longos, e comportamento no limite do horário ativo."
+          },
+          {
+            "id": 3,
+            "title": "Validar horário ativo e bloquear lembretes fora da janela",
+            "description": "Garantir que lembretes sejam emitidos apenas dentro do horário ativo configurado.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Aplicar regra start < now < end; se fora, calcular próximo horário de início e aguardar.",
+            "testStrategy": "Testar antes do início, durante a janela e após o fim."
+          },
+          {
+            "id": 4,
+            "title": "Notificação de lembrete no console com beep",
+            "description": "Exibir mensagem no console com hora, faltante e sugestão de ingestão; emitir beep simples.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Usar Console.Beep e Console.WriteLine para exibir alerta. Mensagem deve incluir horário atual, ml restantes e sugestão baseada no copo padrão.",
+            "testStrategy": "Testar formato da mensagem e execução do beep em Windows."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Registro de ingestão com log flexível e desfazer",
+        "description": "Permite registrar água em ml ou pelo copo padrão e desfazer o último registro do dia.",
+        "status": "pending",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "details": "Implementar comandos de log: `log <ml>` e `log --cup` (usa tamanho padrão). Registrar eventos com timestamp UTC no arquivo water_events.json (lista de eventos). Atualizar total diário e disponibilizar comando para desfazer o último registro do dia. Validar valores de entrada e manter consistência dos totais.",
+        "testStrategy": "Testar logs com valores válidos/invalidos, uso do copo padrão, e desfazer último evento. Verificar totais diários após operações.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Serviço de registro de água (ml e copo)",
+            "description": "Criar serviço que registra eventos de ingestão e atualiza total diário.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Implementar WaterEntryService para inserir eventos no water_events.json (lista de eventos) com timestamp UTC e recalcular total diário (agregação por data em memória e/ou arquivo daily_summary.json). Suportar entrada em ml e copo padrão.",
+            "testStrategy": "Testar inserção e cálculo do total diário em cenários simples."
+          },
+          {
+            "id": 2,
+            "title": "Desfazer último registro do dia",
+            "description": "Implementar undo do último evento de ingestão do dia corrente.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Buscar o último evento do dia (UTC) e removê-lo, atualizando o total diário. Retornar mensagem de confirmação.",
+            "testStrategy": "Testar com 0 eventos (deve informar), 1 evento e múltiplos eventos."
+          },
+          {
+            "id": 3,
+            "title": "Comando CLI para log de água",
+            "description": "Adicionar comando `log` com parsing flexível para ml ou --cup.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Implementar parsing de argumentos, validação e chamada ao serviço de registro. Exibir confirmação com total do dia.",
+            "testStrategy": "Testar entradas: `log 250`, `log --cup`, `log 0`, `log -1`, `log abc`."
+          },
+          {
+            "id": 4,
+            "title": "Cobertura de testes para registro e totais diários",
+            "description": "Adicionar testes unitários para validações e cálculos de totais diários.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Testar cálculo do total diário, regras de validação e comportamento do undo. Inclui bordas (virada do dia UTC).",
+            "testStrategy": "Executar suite de testes e validar cenários de borda com datas diferentes."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Histórico diário e exportação CSV",
+        "description": "Exibe histórico dos últimos dias e exporta CSV de totais e eventos para análise.",
+        "status": "pending",
+        "priority": "medium",
+        "dependencies": [
+          3
+        ],
+        "details": "Implementar consulta de histórico diário (últimos N dias) a partir de daily_summary.json ou agregação dos eventos e comandos `history` e `export`. O history deve mostrar data, total em ml, status (completo/incompleto) e progresso. O export deve gerar CSV em conformidade com RFC 4180, com opção de salvar em arquivo. Usar arquivos JSON locais como fonte de dados (settings.json, water_events.json, daily_summary.json).",
+        "testStrategy": "Testar consultas de histórico com vários dias, exportação CSV e escrita em arquivo. Validar formato e conteúdo.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Consulta de histórico diário no JSON",
+            "description": "Criar leitura/agrupamento para recuperar totais diários (últimos N dias).",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Implementar WaterHistoryRepository lendo daily_summary.json ou agregando water_events.json e retornando Date, TotalMl, IsCurrentDay.",
+            "testStrategy": "Testar com base vazia, 1 dia e múltiplos dias."
+          },
+          {
+            "id": 2,
+            "title": "Formatador CSV para totais diários (RFC 4180)",
+            "description": "Gerar CSV com cabeçalho e escaping correto, datas ISO 8601.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Implementar CsvExportFormatter com escape de aspas e campos com vírgula/quebras de linha. Incluir cabeçalho e status do dia.",
+            "testStrategy": "Testar formatação com dados simples e campos com caracteres especiais."
+          },
+          {
+            "id": 3,
+            "title": "Escrita do CSV em arquivo com local configurável",
+            "description": "Salvar CSV em arquivo com nome timestamped e diretório configurável.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Implementar serviço de exportação que cria diretórios se necessário e escreve arquivo UTF-8. Retornar caminho salvo.",
+            "testStrategy": "Testar criação de diretório, escrita de arquivo e tratamento de erros de permissão."
+          },
+          {
+            "id": 4,
+            "title": "Comando CLI para exibir histórico",
+            "description": "Exibir tabela no console com totais diários e progresso.",
+            "status": "pending",
+            "priority": "high",
+            "dependencies": [],
+            "details": "Implementar HistoryCommand e formatador de tabela com colunas de data, total, status e progresso (%).",
+            "testStrategy": "Testar saída com 0 dias, 1 dia e vários dias; validar alinhamento e cálculos."
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2026-01-19T13:45:37.716129Z",
+      "updated": "2026-01-19T13:45:37.716129Z",
+      "description": "Tasks importadas do TryHamster e traduzidas para PT-BR"
+    }
+  }
+}
