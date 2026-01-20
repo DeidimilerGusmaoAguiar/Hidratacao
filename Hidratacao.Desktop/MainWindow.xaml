@@ -103,6 +103,7 @@
                     <Button x:Name="StartButton" Content="Start" Width="82" Height="30" Margin="0,0,8,0" Click="StartButton_Click" Style="{StaticResource AccentButton}" ToolTip="Iniciar lembretes automáticos"/>
                     <Button x:Name="StopButton" Content="Stop" Width="82" Height="30" Margin="0,0,8,0" Click="StopButton_Click" ToolTip="Parar lembretes automáticos"/>
                     <Button x:Name="QuickLogButton" Content="Beber 1 copo" Height="30" Padding="12,4" Margin="0,0,12,0" Click="QuickLogButton_Click" ToolTip="Registrar 1 copo usando o tamanho padrão"/>
+                    <Button x:Name="ResetButton" Content="Zerar dia" Height="30" Padding="12,4" Margin="0,0,12,0" Click="ResetButton_Click" ToolTip="Remover todas as ingestões de hoje"/>
                     <CheckBox x:Name="TopmostCheckBox" Content="Top" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" Checked="TopmostCheckBox_Checked" Unchecked="TopmostCheckBox_Checked" ToolTip="Manter janela sempre por cima"/>
                     <TextBlock Text="Transp" Foreground="{StaticResource TextMuted}" Margin="16,0,6,0" VerticalAlignment="Center"/>
                     <Slider x:Name="OpacitySlider" Width="120" Minimum="0.55" Maximum="1" Value="0.9" ValueChanged="OpacitySlider_ValueChanged" ToolTip="Ajustar transparencia da janela"/>

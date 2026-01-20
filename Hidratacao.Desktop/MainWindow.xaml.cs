@@ -190,6 +190,28 @@ public partial class MainWindow : Window
         await UpdateNextReminderAsync();
     }
 
+    private async void ResetButton_Click(object sender, RoutedEventArgs e)
+    {
+        var confirm = MessageBox.Show("Zerar as ingestões de hoje?", "Hidratacao", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        while (true)
+        {
+            var result = await _waterEntryService.UndoLastTodayAsync();
+            if (!result.Success)
+            {
+                break;
+            }
+        }
+
+        ShowToast("Dia zerado. Comeca de novo.");
+        await UpdateSummaryAsync();
+        await UpdateNextReminderAsync();
+    }
+
 
     private void TopmostCheckBox_Checked(object sender, RoutedEventArgs e)
     {
